@@ -282,7 +282,9 @@ enum AirliftBridge {
 
         let message = consumeError(outputError)
         guard result == 0, let output else {
-            throw AirliftBridgeError.operationFailed(message ?? "Airlift read failed (code \(result)).")
+            throw AirliftBridgeError.operationFailed(
+                friendlyError(message, fallback: "Airlift read failed (code \(result)).")
+            )
         }
 
         defer { cBytesFree(output, outputLength) }
@@ -309,7 +311,9 @@ enum AirliftBridge {
 
         let message = consumeError(outputError)
         guard result == 0 else {
-            throw AirliftBridgeError.operationFailed(message ?? "Airlift write failed (code \(result)).")
+            throw AirliftBridgeError.operationFailed(
+                friendlyError(message, fallback: "Airlift write failed (code \(result)).")
+            )
         }
     }
 
