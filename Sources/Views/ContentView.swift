@@ -335,7 +335,7 @@ struct ContentView: View {
                 .frame(width: 9, height: 9)
             Text(vpnConnected ? "Connected" : "Disconnected")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(vpnConnected ? .green : .secondary)
+                .foregroundStyle(vpnConnected ? Color.green : Color.secondary)
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 17)
@@ -435,7 +435,7 @@ struct ContentView: View {
                 .foregroundStyle(.white)
             Text(status)
                 .font(.caption)
-                .foregroundStyle(isError ? .red : .secondary)
+                .foregroundStyle(isError ? Color.red : Color.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
