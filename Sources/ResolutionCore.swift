@@ -231,7 +231,7 @@ enum AirliftBridge {
         try ensureGrappaProvider()
         let result = targetHost.withCString { cSetTargetHost($0) }
         guard result == 0 else {
-            throw AirliftBridgeError.operationFailed("Airlift could not set the LocalDevVPN target (code \\(result)). Reconnect LocalDevVPN and try again.")
+            throw AirliftBridgeError.operationFailed("Airlift could not set the LocalDevVPN target (code " + String(result) + "). Reconnect LocalDevVPN and try again.")
         }
     }
 
@@ -316,7 +316,7 @@ enum AirliftBridge {
     private static func friendlyError(_ message: String?, fallback: String) -> String {
         guard let message else { return fallback }
         if message.localizedCaseInsensitiveContains("channel closed") {
-            return message + "\\nThe AirTraffic channel closed before the operation finished. Verify the pairing record and LocalDevVPN connection, reconnect both, then retry."
+            return message + "\nThe AirTraffic channel closed before the operation finished. Verify the pairing record and LocalDevVPN connection, reconnect both, then retry."
         }
         return message
     }
