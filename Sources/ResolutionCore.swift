@@ -73,7 +73,7 @@ enum PairingStore {
 
     private static var supportDirectory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ResolutionStudio", isDirectory: true)
+            .appendingPathComponent("67", isDirectory: true)
     }
 }
 
@@ -92,7 +92,7 @@ enum PairingStoreError: LocalizedError {
 
 enum BackupStore {
     private static let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("ResolutionStudio/ResolutionBackups", isDirectory: true)
+        .appendingPathComponent("67/ResolutionBackups", isDirectory: true)
     private static let latestName = "latest-original.plist"
 
     static var latestURL: URL { folder.appendingPathComponent(latestName) }
@@ -290,7 +290,7 @@ enum AirliftBridge {
         try configureTunnel()
         let leaf = URL(fileURLWithPath: remotePath).lastPathComponent
         let stage = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ResolutionStudio-Airlift-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("67-Airlift-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: stage, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: stage) }
         try data.write(to: stage.appendingPathComponent(leaf), options: .atomic)
