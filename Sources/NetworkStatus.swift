@@ -30,11 +30,9 @@ enum NetworkStatus {
             defer { current = item.pointee.ifa_next }
             guard let address = item.pointee.ifa_addr,
                   address.pointee.sa_family == sa_family_t(AF_INET),
-                  let name = item.pointee.ifa_name.withMemoryRebound(to: CChar.self, capacity: 1, { ptr in
-                      String(validatingUTF8: ptr)
-                  }),
+                  let rawName = item.pointee.ifa_name,
                   let numeric = numericHost(address) else { continue }
-            results.append(IPv4Interface(name: name, address: numeric))
+            results.append(IPv4Interface(name: String(cString: rawName), address: numeric))
         }
         return results
     }
