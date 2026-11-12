@@ -7,7 +7,7 @@ on:
       - main
 
 concurrency:
-  group: resolution-studio-main
+  group: 67-main
   cancel-in-progress: true
 
 jobs:
@@ -49,11 +49,11 @@ jobs:
           mkdir -p build/Payload
           cp -R build/ResolutionStudio.xcarchive/Products/Applications/ResolutionStudio.app build/Payload/
           cd build
-          ditto -c -k --sequesterRsrc --keepParent Payload ResolutionStudio-unsigned.ipa
+          ditto -c -k --sequesterRsrc --keepParent Payload 67-unsigned.ipa
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: ResolutionStudio-unsigned-ipa
-          path: build/ResolutionStudio-unsigned.ipa
+          name: 67-unsigned-ipa
+          path: build/67-unsigned.ipa
           if-no-files-found: error
