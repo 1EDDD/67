@@ -673,7 +673,7 @@ struct ContentView: View {
             return
         }
         restartRequired = false
-        status = "Respring was triggered."
+        status = "Respring attempt started. If SpringBoard does not restart, reboot the device manually."
         isError = false
     }
 
