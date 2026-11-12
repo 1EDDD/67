@@ -3,7 +3,8 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @AppStorage("localDevVPNConfirmed") private var localVPNEnabled = false
-    @AppStorage("pendingSpringBoardRespring") private var pendingRespring = false
+    @AppStorage("pendingSpringBoardRespring") private var restartRequired = false
+
     @State private var widthText = "2048"
     @State private var heightText = "1536"
     @State private var pairingName = PairingStore.currentFileName
@@ -12,11 +13,13 @@ struct ContentView: View {
     @State private var isError = false
     @State private var busy = false
     @State private var importingPairing = false
-    @State private var confirmRespring = false
     @State private var alertMessage = ""
     @State private var showAlert = false
 
-    private var ready: Bool { PairingStore.currentURL != nil && localVPNEnabled && !busy }
+    private var ready: Bool {
+        PairingStore.currentURL != nil && localVPNEnabled && !busy
+    }
+
     private var selected: CanvasResolution? {
         guard let width = Int(widthText), let height = Int(heightText) else { return nil }
         return CanvasResolution(width: width, height: height)
@@ -31,7 +34,7 @@ struct ContentView: View {
                     presetCard
                     connectionCard
                     actionsCard
-                    respringCard
+                    restartCard
                     statusCard
                 }
                 .padding(18)
@@ -39,7 +42,11 @@ struct ContentView: View {
             .background(Color(uiColor: .systemBackground))
             .navigationTitle("Resolution Studio")
             .navigationBarTitleDisplayMode(.inline)
-            .fileImporter(isPresented: $importingPairing, allowedContentTypes: [.data, .propertyList], allowsMultipleSelection: false) { result in
+            .fileImporter(
+                isPresented: $importingPairing,
+                allowedContentTypes: [.data, .propertyList],
+                allowsMultipleSelection: false
+            ) { result in
                 importPairing(result)
             }
             .alert("Resolution Studio", isPresented: $showAlert) {
@@ -47,62 +54,76 @@ struct ContentView: View {
             } message: {
                 Text(alertMessage)
             }
-            .confirmationDialog("Respring SpringBoard?", isPresented: $confirmRespring, titleVisibility: .visible) {
-                Button("Respring SpringBoard", role: .destructive) { runRespring() }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("The screen may go black briefly while SpringBoard restarts. This is not a full device reboot. Use this only after the iPad has rebooted with the new canvas values.")
-            }
         }
         .tint(.cyan)
-        .onAppear { pairingName = PairingStore.currentFileName }
+        .onAppear {
+            pairingName = PairingStore.currentFileName
+        }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 7) {
             Label("DISPLAY CONTROL", systemImage: "display")
-                .font(.caption.weight(.bold)).tracking(1.3).foregroundStyle(.cyan)
+                .font(.caption.weight(.bold))
+                .tracking(1.3)
+                .foregroundStyle(.cyan)
+
             Text("Custom Resolution")
                 .font(.system(size: 30, weight: .bold, design: .rounded))
+
             Text("Edit canvas dimensions while preserving the rest of the display property list.")
-                .font(.subheadline).foregroundStyle(.secondary)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
     }
 
     private var editorCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Canvas dimensions").font(.headline)
+                Text("Canvas dimensions")
+                    .font(.headline)
                 Spacer()
                 if let selected {
                     Text(selected.orientationLabel.uppercased())
-                        .font(.caption2.weight(.bold)).foregroundStyle(.cyan)
-                        .padding(.horizontal, 9).padding(.vertical, 5)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.cyan)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
                         .background(.cyan.opacity(0.12), in: Capsule())
                 }
             }
+
             HStack(spacing: 12) {
                 numberField("WIDTH", value: $widthText)
-                Image(systemName: "xmark").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
                 numberField("HEIGHT", value: $heightText)
             }
+
             HStack {
                 if let selected {
                     Label(selected.megapixels, systemImage: "square.grid.3x3")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 } else {
                     Label("Enter two whole numbers", systemImage: "exclamationmark.circle")
-                        .font(.caption).foregroundStyle(.orange)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
                 }
+
                 Spacer()
+
                 Button {
                     let previous = widthText
                     widthText = heightText
                     heightText = previous
                 } label: {
-                    Label("Rotate", systemImage: "rotate.3d").font(.caption.weight(.semibold))
+                    Label("Rotate", systemImage: "rotate.3d")
+                        .font(.caption.weight(.semibold))
                 }
-                .buttonStyle(.bordered).disabled(busy)
+                .buttonStyle(.bordered)
+                .disabled(busy)
             }
         }
         .padding(16)
@@ -111,10 +132,15 @@ struct ContentView: View {
 
     private func numberField(_ title: String, value: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+            Text(title)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.secondary)
+
             TextField("2048", text: value)
                 .font(.system(size: 25, weight: .semibold, design: .rounded).monospacedDigit())
-                .keyboardType(.numberPad).textFieldStyle(.plain).lineLimit(1)
+                .keyboardType(.numberPad)
+                .textFieldStyle(.plain)
+                .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
@@ -123,7 +149,9 @@ struct ContentView: View {
 
     private var presetCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Presets").font(.headline)
+            Text("Presets")
+                .font(.headline)
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 9) {
                     ForEach(ResolutionPreset.all) { preset in
@@ -132,20 +160,30 @@ struct ContentView: View {
                             heightText = String(preset.resolution.height)
                         } label: {
                             VStack(alignment: .leading, spacing: 5) {
-                                Text(preset.name).font(.caption.weight(.semibold))
-                                Text(preset.resolution.displayValue).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                                Text(preset.name)
+                                    .font(.caption.weight(.semibold))
+                                Text(preset.resolution.displayValue)
+                                    .font(.caption2.monospacedDigit())
+                                    .foregroundStyle(.secondary)
                             }
-                            .frame(minWidth: 125, alignment: .leading).padding(12)
+                            .frame(minWidth: 125, alignment: .leading)
+                            .padding(12)
                             .background(
-                                selected == preset.resolution ? Color.cyan.opacity(0.16) : Color(uiColor: .secondarySystemBackground),
+                                selected == preset.resolution
+                                    ? Color.cyan.opacity(0.16)
+                                    : Color(uiColor: .secondarySystemBackground),
                                 in: RoundedRectangle(cornerRadius: 14)
                             )
                             .overlay {
                                 RoundedRectangle(cornerRadius: 14)
-                                    .stroke(selected == preset.resolution ? Color.cyan.opacity(0.8) : Color.clear, lineWidth: 1)
+                                    .stroke(
+                                        selected == preset.resolution ? Color.cyan.opacity(0.8) : Color.clear,
+                                        lineWidth: 1
+                                    )
                             }
                         }
-                        .buttonStyle(.plain).disabled(busy)
+                        .buttonStyle(.plain)
+                        .disabled(busy)
                     }
                 }
             }
@@ -155,32 +193,57 @@ struct ContentView: View {
     private var connectionCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Airlift connection").font(.headline)
+                Text("Airlift connection")
+                    .font(.headline)
                 Spacer()
-                Circle().fill(ready ? Color.green : Color.orange).frame(width: 8, height: 8)
+                Circle()
+                    .fill(ready ? Color.green : Color.orange)
+                    .frame(width: 8, height: 8)
                 Text(ready ? "READY" : "SETUP REQUIRED")
-                    .font(.caption2.weight(.bold)).foregroundStyle(ready ? .green : .orange)
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(ready ? .green : .orange)
             }
+
             HStack(spacing: 10) {
-                Image(systemName: "doc.badge.gearshape").font(.title3).foregroundStyle(.cyan)
+                Image(systemName: "doc.badge.gearshape")
+                    .font(.title3)
+                    .foregroundStyle(.cyan)
+
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Pairing record").font(.subheadline.weight(.semibold))
-                    Text(pairingName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Text("Pairing record")
+                        .font(.subheadline.weight(.semibold))
+                    Text(pairingName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
+
                 Spacer(minLength: 0)
-                Button("Import") { importingPairing = true }.buttonStyle(.bordered).disabled(busy)
+
+                Button("Import") {
+                    importingPairing = true
+                }
+                .buttonStyle(.bordered)
+                .disabled(busy)
             }
+
             Divider()
+
             Toggle(isOn: $localVPNEnabled) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("LocalDevVPN is enabled").font(.subheadline.weight(.semibold))
+                    Text("LocalDevVPN is enabled")
+                        .font(.subheadline.weight(.semibold))
                     Text("Enable the loopback VPN before reading or writing the iPad file.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
-            .tint(.green).disabled(busy)
+            .tint(.green)
+            .disabled(busy)
+
             Text("Airlift connects through 10.7.0.1. The pairing record stays in this app's private storage.")
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
         .padding(16)
         .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
@@ -188,43 +251,70 @@ struct ContentView: View {
 
     private var actionsCard: some View {
         VStack(spacing: 10) {
-            Button { Task { await readCurrent() } } label: {
-                Label("Read current resolution", systemImage: "arrow.down.doc").frame(maxWidth: .infinity)
+            Button {
+                Task { await readCurrent() }
+            } label: {
+                Label("Read current resolution", systemImage: "arrow.down.doc")
+                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered).disabled(!ready)
+            .buttonStyle(.bordered)
+            .disabled(!ready)
 
-            Button { Task { await applyResolution() } } label: {
+            Button {
+                Task { await applyResolution() }
+            } label: {
                 HStack {
-                    if busy { ProgressView().tint(.black) } else { Image(systemName: "checkmark.circle.fill") }
+                    if busy {
+                        ProgressView().tint(.black)
+                    } else {
+                        Image(systemName: "checkmark.circle.fill")
+                    }
                     Text(busy ? "Working…" : "Apply resolution")
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent).tint(.cyan).disabled(!ready || selected == nil)
+            .buttonStyle(.borderedProminent)
+            .tint(.cyan)
+            .disabled(!ready || selected == nil)
 
-            Button { Task { await restoreBackup() } } label: {
-                Label("Restore saved backup", systemImage: "arrow.uturn.backward").frame(maxWidth: .infinity)
+            Button {
+                Task { await restoreBackup() }
+            } label: {
+                Label("Restore saved backup", systemImage: "arrow.uturn.backward")
+                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered).disabled(!ready || !BackupStore.hasBackup)
+            .buttonStyle(.bordered)
+            .disabled(!ready || !BackupStore.hasBackup)
         }
     }
 
-    private var respringCard: some View {
+    private var restartCard: some View {
         VStack(alignment: .leading, spacing: 11) {
             HStack {
-                Image(systemName: "arrow.clockwise.circle.fill").foregroundStyle(.cyan)
-                Text("Finish after reboot").font(.headline)
+                Image(systemName: "arrow.clockwise.circle.fill")
+                    .foregroundStyle(.cyan)
+                Text("Restart required")
+                    .font(.headline)
                 Spacer()
-                if pendingRespring {
-                    Text("PENDING").font(.caption2.weight(.bold)).foregroundStyle(.orange)
+                if restartRequired {
+                    Text("PENDING")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.orange)
                 }
             }
-            Text("After Apply succeeds, reboot the iPad manually. When it has started again, open this app and respring SpringBoard.")
-                .font(.caption).foregroundStyle(.secondary)
-            Button { confirmRespring = true } label: {
-                Label("Respring SpringBoard", systemImage: "arrow.triangle.2.circlepath").frame(maxWidth: .infinity)
+
+            Text("After applying or restoring the display configuration, restart the iPad manually to load the new canvas values. This build does not run the unstable WebView respring shortcut.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if restartRequired {
+                Button("I restarted the iPad") {
+                    restartRequired = false
+                    status = "Restart marked complete. Read the current resolution to verify the values."
+                    isError = false
+                }
+                .buttonStyle(.bordered)
             }
-            .buttonStyle(.borderedProminent).tint(.orange).disabled(!pendingRespring || busy)
         }
         .padding(16)
         .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
@@ -232,12 +322,22 @@ struct ContentView: View {
 
     private var statusCard: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("DEVICE STATUS").font(.caption2.weight(.bold)).tracking(1.2).foregroundStyle(.secondary)
-            Text(currentResolution).font(.system(.body, design: .rounded).weight(.semibold)).monospacedDigit()
-            Text(status).font(.caption).foregroundStyle(isError ? .red : .secondary)
+            Text("DEVICE STATUS")
+                .font(.caption2.weight(.bold))
+                .tracking(1.2)
+                .foregroundStyle(.secondary)
+
+            Text(currentResolution)
+                .font(.system(.body, design: .rounded).weight(.semibold))
+                .monospacedDigit()
+
+            Text(status)
+                .font(.caption)
+                .foregroundStyle(isError ? .red : .secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading).padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
         .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
     }
 
@@ -248,7 +348,9 @@ struct ContentView: View {
             pairingName = saved.lastPathComponent
             isError = false
             status = "Pairing record imported. Enable LocalDevVPN to connect."
-        } catch { present(error) }
+        } catch {
+            present(error)
+        }
     }
 
     @MainActor
@@ -257,22 +359,27 @@ struct ContentView: View {
             present(AirliftBridgeError.missingPairingFile)
             return
         }
+
         busy = true
         defer { busy = false }
+
         do {
             let data = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
             try BackupStore.save(data)
+
             if let resolution = try ResolutionPlistEditor.values(from: data) {
                 currentResolution = resolution.displayValue
                 widthText = String(resolution.width)
                 heightText = String(resolution.height)
-                status = "Read succeeded. A local backup of the original plist was saved."
+                status = "Read succeeded. A local backup of the current plist was saved."
             } else {
                 currentResolution = "Canvas keys not found"
                 status = "The file was read, but canvas_width or canvas_height was not present."
             }
             isError = false
-        } catch { present(error) }
+        } catch {
+            present(error)
+        }
     }
 
     @MainActor
@@ -281,20 +388,25 @@ struct ContentView: View {
             present(AirliftBridgeError.missingPairingFile)
             return
         }
+
         guard let width = Int(widthText), let height = Int(heightText) else {
             present(ResolutionEditorError.invalidNumber)
             return
         }
+
         busy = true
         defer { busy = false }
+
         do {
             try ResolutionPlistEditor.validate(width: width, height: height)
             let original = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
             try BackupStore.save(original)
             let modified = try ResolutionPlistEditor.applying(width: width, height: height, to: original)
+
             do {
                 try await AirliftBridge.writeDisplayConfiguration(modified, pairingURL: pairing)
                 let verified = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
+
                 guard let actual = try ResolutionPlistEditor.values(from: verified),
                       actual == CanvasResolution(width: width, height: height) else {
                     throw ResolutionEditorError.verificationFailed
@@ -303,11 +415,14 @@ struct ContentView: View {
                 try? await AirliftBridge.writeDisplayConfiguration(original, pairingURL: pairing)
                 throw error
             }
+
             currentResolution = "\(width) × \(height)"
-            pendingRespring = true
+            restartRequired = true
             isError = false
-            status = "The new values were written and read back successfully. Reboot the iPad, then return here and respring."
-        } catch { present(error) }
+            status = "The new values were written and read back successfully. Restart the iPad to load them."
+        } catch {
+            present(error)
+        }
     }
 
     @MainActor
@@ -316,31 +431,26 @@ struct ContentView: View {
             present(AirliftBridgeError.missingPairingFile)
             return
         }
+
         busy = true
         defer { busy = false }
+
         do {
             let backup = try BackupStore.loadLatest()
             try await AirliftBridge.writeDisplayConfiguration(backup, pairingURL: pairing)
             let verified = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
             guard verified == backup else { throw ResolutionEditorError.verificationFailed }
+
             if let resolution = try ResolutionPlistEditor.values(from: verified) {
                 currentResolution = resolution.displayValue
             }
-            pendingRespring = true
-            isError = false
-            status = "The saved original plist was restored and verified. Reboot the iPad, then respring."
-        } catch { present(error) }
-    }
 
-    @MainActor
-    private func runRespring() {
-        guard NeoSpring.trigger() else {
-            present(AirliftBridgeError.operationFailed("Could not find an active app window for the respring view."))
-            return
+            restartRequired = true
+            isError = false
+            status = "The saved plist was restored and verified. Restart the iPad to load it."
+        } catch {
+            present(error)
         }
-        pendingRespring = false
-        isError = false
-        status = "SpringBoard respring was triggered."
     }
 
     @MainActor
