@@ -13,7 +13,17 @@
     <key>LSRequiresIPhoneOS</key><true/>
     <key>MinimumOSVersion</key><string>18.0</string>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>Resolution Studio uses LocalDevVPN to communicate with your paired iPad for display configuration.</string>
+    <string>Resolution Studio uses your local network to pair with the iPad and communicate through Airlift.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_aircardprobe._tcp</string>
+        <string>_remotepairing-pairable-host._tcp</string>
+        <string>_erosionprobe._tcp</string>
+    </array>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>audio</string>
+    </array>
     <key>LSApplicationQueriesSchemes</key><array><string>localdevvpn</string></array>
     <key>UISupportedInterfaceOrientations~ipad</key>
     <array>

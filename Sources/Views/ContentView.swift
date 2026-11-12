@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
+    @StateObject private var pairingController = PairingController.shared
     @AppStorage("localDevVPNConfirmed") private var localVPNEnabled = false
     @AppStorage("pendingSpringBoardRespring") private var restartRequired = false
 
@@ -240,6 +241,39 @@ struct ContentView: View {
                 .disabled(busy)
             }
 
+            Button {
+                Task { await pairTargetDevice() }
+            } label: {
+                HStack {
+                    if pairingController.running {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "link.badge.plus")
+                    }
+                    Text(pairingController.running ? "Pairing…" : "Pair an iPad")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.cyan)
+            .disabled(busy || pairingController.running)
+
+            if pairingController.running || pairingController.pairingStatus != "idle" {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(pairingController.pairingStatus)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let pin = pairingController.pairingPIN {
+                        Text(pin)
+                            .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(.cyan)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(Color(uiColor: .tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 13))
+            }
+
             Divider()
 
             Toggle(isOn: $localVPNEnabled) {
@@ -254,7 +288,7 @@ struct ContentView: View {
             .tint(.green)
             .disabled(busy)
 
-            Text("Airlift connects through 10.7.0.1. The pairing record stays in this app's private storage.")
+            Text("Pair the target iPad from Settings › Privacy & Security › Developer Mode. After pairing, enable LocalDevVPN and connect through 10.7.0.1.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
@@ -362,6 +396,23 @@ struct ContentView: View {
             pairingName = saved.lastPathComponent
             isError = false
             status = "Pairing record imported. Enable LocalDevVPN to connect."
+        } catch {
+            present(error)
+        }
+    }
+
+
+    @MainActor
+    private func pairTargetDevice() async {
+        busy = true
+        defer { busy = false }
+
+        do {
+            let path = try await pairingController.startAndWait()
+            let saved = try PairingStore.importFile(from: URL(fileURLWithPath: path))
+            pairingName = saved.lastPathComponent
+            isError = false
+            status = "Pairing succeeded. Enable LocalDevVPN, then read the current resolution."
         } catch {
             present(error)
         }
