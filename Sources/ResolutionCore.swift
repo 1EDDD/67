@@ -158,6 +158,19 @@ enum ResolutionPlistEditor {
 
 private typealias AirliftLogCallback = @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> Void
 
+
+@_silgen_name("ALGetGrappaToken")
+private func cGetGrappaToken(
+    _ version: UInt32,
+    _ deviceType: UInt32,
+    _ protocolVersion: UInt32,
+    _ outputBuffer: UnsafeMutablePointer<UInt8>?,
+    _ maxLength: Int,
+    _ outputLength: UnsafeMutablePointer<Int>?,
+    _ errorBuffer: UnsafeMutablePointer<CChar>?,
+    _ errorLength: Int
+) -> Int32
+
 @_silgen_name("al_set_target_host")
 private func cSetTargetHost(_ host: UnsafePointer<CChar>?) -> Int32
 
@@ -214,12 +227,46 @@ enum AirliftBridge {
         }.value
     }
 
-    private static func configureTunnel() {
+    private static func configureTunnel() throws {
+        try ensureGrappaProvider()
         _ = targetHost.withCString { cSetTargetHost($0) }
     }
 
+    /// Keep ALGetGrappaToken linked into the app. Airlift resolves this symbol
+    /// dynamically during the AirTraffic sync, so a normal static reference is
+    /// needed even though the Rust library calls it through dlsym.
+    private static func ensureGrappaProvider() throws {
+        var token = [UInt8](repeating: 0, count: 512)
+        var tokenLength = 0
+        var errorBuffer = [CChar](repeating: 0, count: 512)
+
+        let result = token.withUnsafeMutableBufferPointer { tokenPointer in
+            errorBuffer.withUnsafeMutableBufferPointer { errorPointer in
+                cGetGrappaToken(
+                    1,
+                    0,
+                    1,
+                    tokenPointer.baseAddress,
+                    tokenPointer.count,
+                    &tokenLength,
+                    errorPointer.baseAddress,
+                    errorPointer.count
+                )
+            }
+        }
+
+        guard result == 0, tokenLength > 0 else {
+            let message = errorBuffer.withUnsafeBufferPointer { pointer in
+                pointer.baseAddress.map { String(cString: $0) } ?? "unknown Grappa error"
+            }
+            throw AirliftBridgeError.operationFailed(
+                "Grappa token provider unavailable: " + message + " (code " + String(result) + ")."
+            )
+        }
+    }
+
     private static func readSynchronously(pairingPath: String, remotePath: String) throws -> Data {
-        configureTunnel()
+        try configureTunnel()
         var output: UnsafeMutablePointer<UInt8>?
         var outputLength = 0
         var outputError: UnsafeMutablePointer<CChar>?
@@ -240,7 +287,7 @@ enum AirliftBridge {
     }
 
     private static func writeSynchronously(_ data: Data, pairingPath: String, remotePath: String) throws {
-        configureTunnel()
+        try configureTunnel()
         let leaf = URL(fileURLWithPath: remotePath).lastPathComponent
         let stage = FileManager.default.temporaryDirectory
             .appendingPathComponent("ResolutionStudio-Airlift-\(UUID().uuidString)", isDirectory: true)
