@@ -1,0 +1,13 @@
+Resolution Studio third-party notices
+
+Airlift FFI
+- AirCard-iOS base implementation by Mak5er is licensed under the MIT License.
+- The Airlift raw-read extension is derived from the GPL-3.0-licensed AirBeepSwap patch.
+- The AirTraffic file transport uses an imported device pairing record and a user-enabled LocalDevVPN loopback tunnel.
+
+Respring
+- The WebView/NeoSpring respring approach is based on the implementation in Erosion by jailbreakdotparty.
+- The upstream web approach is credited to neonmodder123 and the Swift implementation to skadz108.
+- Erosion is licensed under GNU GPL version 3.0.
+
+This project is distributed under GPL-3.0. The AirCard MIT license is retained in THIRD_PARTY_LICENSES/AirCard-MIT.txt.

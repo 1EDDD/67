@@ -1,0 +1,37 @@
+name: ResolutionStudio
+options:
+  bundleIdPrefix: com.1eddd
+  deploymentTarget:
+    iOS: "18.0"
+  projectFormat: xcode16_0
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    TARGETED_DEVICE_FAMILY: "2"
+    PRODUCT_BUNDLE_IDENTIFIER: com.1eddd.resolutionstudio
+    INFOPLIST_FILE: Info.plist
+    GENERATE_INFOPLIST_FILE: "NO"
+    CODE_SIGN_STYLE: Automatic
+    EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64
+    OTHER_LDFLAGS: "-lc++"
+targets:
+  ResolutionStudio:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    dependencies:
+      - framework: AirliftFFI.xcframework
+        embed: false
+    settings:
+      base:
+        PRODUCT_NAME: "ResolutionStudio"
+        INFOPLIST_FILE: Info.plist
+        GENERATE_INFOPLIST_FILE: "NO"
+schemes:
+  ResolutionStudio:
+    build:
+      targets:
+        ResolutionStudio: all
