@@ -430,13 +430,11 @@ struct ContentView: View {
 
         do {
             let data = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
-            try BackupStore.save(data)
-
             if let resolution = try ResolutionPlistEditor.values(from: data) {
                 currentResolution = resolution.displayValue
                 widthText = String(resolution.width)
                 heightText = String(resolution.height)
-                status = "Read succeeded. A local backup of the current plist was saved."
+                status = "Read succeeded. The existing restore backup was left unchanged."
             } else {
                 currentResolution = "Canvas keys not found"
                 status = "The file was read, but canvas_width or canvas_height was not present."
