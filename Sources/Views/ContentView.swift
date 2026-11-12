@@ -3,420 +3,573 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var pairingController = PairingController.shared
-    @AppStorage("localDevVPNConfirmed") private var localVPNEnabled = false
+    @AppStorage("hasShown67Instructions") private var hasShownInstructions = false
     @AppStorage("pendingSpringBoardRespring") private var restartRequired = false
 
-    @State private var widthText = "2048"
-    @State private var heightText = "1536"
+    @State private var widthText = ""
+    @State private var heightText = ""
+    @State private var currentResolution = "—"
+    @State private var status = "Pair your device or import a pairing file."
     @State private var pairingName = PairingStore.currentFileName
-    @State private var currentResolution = "Not read yet"
-    @State private var status = "Import your pairing file and enable LocalDevVPN to begin."
-    @State private var isError = false
+    @State private var vpnConnected = false
     @State private var busy = false
     @State private var importingPairing = false
+    @State private var showInstructions = false
+    @State private var showPresets = false
+    @State private var selectedPresetCategory: PresetDeviceCategory?
     @State private var confirmRespring = false
-    @State private var alertMessage = ""
     @State private var showAlert = false
+    @State private var alertMessage = ""
+    @State private var isError = false
 
-    private var ready: Bool {
-        PairingStore.currentURL != nil && localVPNEnabled && !busy
-    }
-
-    private var selected: CanvasResolution? {
+    private var selectedResolution: CanvasResolution? {
         guard let width = Int(widthText), let height = Int(heightText) else { return nil }
         return CanvasResolution(width: width, height: height)
     }
 
+    private var ready: Bool {
+        PairingStore.currentURL != nil && vpnConnected && !busy
+    }
+
     var body: some View {
-        NavigationStack {
+        ZStack {
+            Color(red: 0.015, green: 0.018, blue: 0.027).ignoresSafeArea()
+
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    header
-                    editorCard
-                    presetCard
-                    connectionCard
-                    actionsCard
-                    restartCard
+                VStack(spacing: 16) {
+                    mascotHeader
+                    resolutionFields
+                    presetsButton
+                    pairingCard
+                    vpnCard
+                    applyButton
+                    respringButton
+                    utilityActions
                     statusCard
                 }
-                .padding(18)
+                .frame(maxWidth: 760)
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .padding(.bottom, 30)
+                .frame(maxWidth: .infinity)
             }
-            .background(Color(uiColor: .systemBackground))
-            .navigationTitle("Resolution Studio")
-            .navigationBarTitleDisplayMode(.inline)
-            .fileImporter(
-                isPresented: $importingPairing,
-                allowedContentTypes: [.data, .propertyList],
-                allowsMultipleSelection: false
-            ) { result in
-                importPairing(result)
-            }
-            .alert("Resolution Studio", isPresented: $showAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(alertMessage)
-            }
-            .confirmationDialog(
-                "Respring SpringBoard?",
-                isPresented: $confirmRespring,
-                titleVisibility: .visible
-            ) {
-                Button("Respring SpringBoard", role: .destructive) {
-                    runRespring()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This uses Erosion's WebView respring method. The display may go black or freeze temporarily while SpringBoard restarts. Use it only after rebooting the iPad.")
+            .scrollIndicators(.hidden)
+        }
+        .preferredColorScheme(.dark)
+        .fileImporter(
+            isPresented: $importingPairing,
+            allowedContentTypes: [.data, .propertyList],
+            allowsMultipleSelection: false
+        ) { result in
+            importPairing(result)
+        }
+        .sheet(isPresented: $showPresets, onDismiss: { selectedPresetCategory = nil }) {
+            presetsSheet
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .preferredColorScheme(.dark)
+        }
+        .alert("67", isPresented: $showAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(alertMessage)
+        }
+        .confirmationDialog(
+            "Respring SpringBoard?",
+            isPresented: $confirmRespring,
+            titleVisibility: .visible
+        ) {
+            Button("Respring", role: .destructive) { runRespring() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Use this only after saving the resolution and rebooting the device. SpringBoard may briefly disappear while it restarts.")
+        }
+        .overlay {
+            if showInstructions {
+                firstLaunchNotice
+                    .transition(.opacity)
+                    .zIndex(10)
             }
         }
-        .tint(.cyan)
-        .onAppear {
-            pairingName = PairingStore.currentFileName
+        .task {
+            if !hasShownInstructions {
+                showInstructions = true
+            }
+            while !Task.isCancelled {
+                vpnConnected = NetworkStatus.localDevVPNIsConnected()
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
+        .onChange(of: PairingStore.currentURL) { _, url in
+            pairingName = url?.lastPathComponent ?? "No pairing file"
         }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Label("DISPLAY CONTROL", systemImage: "display")
-                .font(.caption.weight(.bold))
-                .tracking(1.3)
-                .foregroundStyle(.cyan)
+    // MARK: - Header
 
-            Text("Custom Resolution")
-                .font(.system(size: 30, weight: .bold, design: .rounded))
+    private var mascotHeader: some View {
+        VStack(spacing: 5) {
+            Image("Mascot")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 132)
+                .accessibilityLabel("67 mascot")
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, 2)
+    }
 
-            Text("Edit canvas dimensions while preserving the rest of the display property list.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+    // MARK: - Resolution editor
+
+    private var resolutionFields: some View {
+        HStack(spacing: 12) {
+            dimensionField(title: "Width", value: $widthText)
+            dimensionField(title: "Height", value: $heightText)
         }
     }
 
-    private var editorCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Canvas dimensions")
-                    .font(.headline)
-                Spacer()
-                if let selected {
-                    Text(selected.orientationLabel.uppercased())
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(.cyan)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(.cyan.opacity(0.12), in: Capsule())
-                }
-            }
-
-            HStack(spacing: 12) {
-                numberField("WIDTH", value: $widthText)
-                Image(systemName: "xmark")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
-                numberField("HEIGHT", value: $heightText)
-            }
-
-            HStack {
-                if let selected {
-                    Label(selected.megapixels, systemImage: "square.grid.3x3")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Label("Enter two whole numbers", systemImage: "exclamationmark.circle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-
-                Spacer()
-
-                Button {
-                    let previous = widthText
-                    widthText = heightText
-                    heightText = previous
-                } label: {
-                    Label("Rotate", systemImage: "rotate.3d")
-                        .font(.caption.weight(.semibold))
-                }
-                .buttonStyle(.bordered)
-                .disabled(busy)
-            }
-        }
-        .padding(16)
-        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
-    }
-
-    private func numberField(_ title: String, value: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+    private func dimensionField(title: String, value: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.caption2.weight(.bold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.secondary)
-
-            TextField("2048", text: value)
-                .font(.system(size: 25, weight: .semibold, design: .rounded).monospacedDigit())
+            TextField("", text: value)
+                .font(.system(size: 23, weight: .semibold, design: .rounded).monospacedDigit())
                 .keyboardType(.numberPad)
                 .textFieldStyle(.plain)
-                .lineLimit(1)
+                .frame(height: 48)
+                .padding(.horizontal, 13)
+                .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 13))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 13)
+                        .stroke(Color.white.opacity(0.07), lineWidth: 1)
+                }
+                .accessibilityLabel(title)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(Color(uiColor: .tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 13))
+        .padding(14)
+        .background(cardBackground)
     }
 
-    private var presetCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Presets")
-                .font(.headline)
+    private var presetsButton: some View {
+        Button {
+            selectedPresetCategory = nil
+            showPresets = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "rectangle.on.rectangle")
+                    .font(.system(size: 19, weight: .medium))
+                    .frame(width: 25)
+                Text("Presets")
+                    .font(.system(size: 17, weight: .semibold))
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 17)
+            .frame(height: 58)
+            .background(cardBackground)
+        }
+        .buttonStyle(.plain)
+        .disabled(busy)
+    }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 9) {
-                    ForEach(ResolutionPreset.all) { preset in
+    private var presetsSheet: some View {
+        NavigationStack {
+            Group {
+                if let category = selectedPresetCategory {
+                    List(DeviceResolutionPreset.all.filter { $0.category == category }) { preset in
                         Button {
                             widthText = String(preset.resolution.width)
                             heightText = String(preset.resolution.height)
+                            showPresets = false
                         } label: {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(preset.name)
-                                    .font(.caption.weight(.semibold))
-                                Text(preset.resolution.displayValue)
-                                    .font(.caption2.monospacedDigit())
-                                    .foregroundStyle(.secondary)
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(preset.name)
+                                        .foregroundStyle(.primary)
+                                    Text(preset.resolution.displayValue)
+                                        .font(.caption.monospacedDigit())
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if selectedResolution == preset.resolution {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.blue)
+                                }
                             }
-                            .frame(minWidth: 125, alignment: .leading)
-                            .padding(12)
-                            .background(
-                                selected == preset.resolution
-                                    ? Color.cyan.opacity(0.16)
-                                    : Color(uiColor: .secondarySystemBackground),
-                                in: RoundedRectangle(cornerRadius: 14)
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(
-                                        selected == preset.resolution ? Color.cyan.opacity(0.8) : Color.clear,
-                                        lineWidth: 1
-                                    )
-                            }
+                            .padding(.vertical, 3)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(busy)
+                        .listRowBackground(Color.white.opacity(0.045))
                     }
+                    .listStyle(.plain)
+                } else {
+                    VStack(spacing: 14) {
+                        categoryButton(.ipad, subtitle: "Landscape presets")
+                        categoryButton(.iphone, subtitle: "Portrait presets")
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(red: 0.025, green: 0.03, blue: 0.045))
+                }
+            }
+            .navigationTitle(selectedPresetCategory?.rawValue ?? "Presets")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if selectedPresetCategory != nil {
+                        Button("Back") { selectedPresetCategory = nil }
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { showPresets = false }
                 }
             }
         }
     }
 
-    private var connectionCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Airlift connection")
-                    .font(.headline)
+    private func categoryButton(_ category: PresetDeviceCategory, subtitle: String) -> some View {
+        Button {
+            selectedPresetCategory = category
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: category == .ipad ? "ipad.landscape" : "iphone")
+                    .font(.system(size: 24))
+                    .foregroundStyle(Color.cyan)
+                    .frame(width: 38)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(category.rawValue)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
-                Circle()
-                    .fill(ready ? Color.green : Color.orange)
-                    .frame(width: 8, height: 8)
-                Text(ready ? "READY" : "SETUP REQUIRED")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(ready ? .green : .orange)
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.secondary)
             }
+            .padding(18)
+            .background(cardBackground)
+        }
+        .buttonStyle(.plain)
+    }
 
-            HStack(spacing: 10) {
-                Image(systemName: "doc.badge.gearshape")
-                    .font(.title3)
-                    .foregroundStyle(.cyan)
+    // MARK: - Pairing & VPN
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Pairing record")
-                        .font(.subheadline.weight(.semibold))
-                    Text(pairingName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 0)
-
-                Button("Import") {
+    private var pairingCard: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: "link")
+                    .font(.system(size: 19, weight: .medium))
+                    .frame(width: 25)
+                Text("Pairing")
+                    .font(.system(size: 17, weight: .semibold))
+                Spacer()
+                Button {
                     importingPairing = true
+                } label: {
+                    Label("File", systemImage: "doc")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(minWidth: 86, minHeight: 42)
+                        .background(Color.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 11))
                 }
-                .buttonStyle(.bordered)
-                .disabled(busy)
-            }
+                .disabled(busy || pairingController.running)
 
-            Button {
-                Task { await pairTargetDevice() }
-            } label: {
-                HStack {
-                    if pairingController.running {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "link.badge.plus")
+                Button {
+                    Task { await pairTargetDevice() }
+                } label: {
+                    HStack(spacing: 7) {
+                        if pairingController.running {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: "link")
+                        }
+                        Text(pairingController.running ? "Pairing…" : "Pair")
                     }
-                    Text(pairingController.running ? "Pairing…" : "Pair an iPad")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(minWidth: 86, minHeight: 42)
+                    .background(Color.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 11))
                 }
-                .frame(maxWidth: .infinity)
+                .disabled(busy || pairingController.running)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.cyan)
-            .disabled(busy || pairingController.running)
+            .foregroundStyle(.white)
+            .padding(15)
 
-            if pairingController.running || pairingController.pairingStatus != "idle" {
+            if !pairingName.isEmpty || pairingController.running || pairingController.pairingStatus != "idle" {
+                Divider().overlay(Color.white.opacity(0.06))
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(pairingController.pairingStatus)
-                        .font(.caption)
+                    Text(pairingName)
+                        .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
-                    if let pin = pairingController.pairingPIN {
-                        Text(pin)
-                            .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
-                            .foregroundStyle(.cyan)
+                    if pairingController.running || pairingController.pairingStatus != "idle" {
+                        Text(pairingController.pairingStatus)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let pin = pairingController.pairingPIN {
+                            Text(pin)
+                                .font(.system(size: 28, weight: .bold, design: .rounded).monospacedDigit())
+                                .foregroundStyle(.cyan)
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-                .background(Color(uiColor: .tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 13))
+                .padding(14)
             }
-
-            Divider()
-
-            Toggle(isOn: $localVPNEnabled) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("LocalDevVPN is enabled")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Enable the loopback VPN before reading or writing the iPad file.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .tint(.green)
-            .disabled(busy)
-
-            Text("Pair the target iPad from Settings › Privacy & Security › Developer Mode. After pairing, enable LocalDevVPN and connect through 10.7.0.1.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
         }
-        .padding(16)
-        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
+        .background(cardBackground)
     }
 
-    private var actionsCard: some View {
-        VStack(spacing: 10) {
+    private var vpnCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "point.3.connected.trianglepath.dotted")
+                .font(.system(size: 20))
+                .frame(width: 25)
+            Text("LocalDevVPN")
+                .font(.system(size: 17, weight: .semibold))
+            Spacer()
+            Circle()
+                .fill(vpnConnected ? Color.green : Color.gray)
+                .frame(width: 9, height: 9)
+            Text(vpnConnected ? "Connected" : "Disconnected")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(vpnConnected ? .green : .secondary)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 17)
+        .frame(height: 60)
+        .background(cardBackground)
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - Actions
+
+    private var applyButton: some View {
+        Button {
+            Task { await applyResolution() }
+        } label: {
+            HStack(spacing: 10) {
+                if busy {
+                    ProgressView().tint(.white)
+                } else {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 18, weight: .bold))
+                }
+                Text(busy ? "Working…" : "Apply Resolution")
+                    .font(.system(size: 17, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 63)
+            .background(
+                LinearGradient(colors: [Color(red: 0.08, green: 0.58, blue: 1),
+                                        Color(red: 0.02, green: 0.31, blue: 0.98)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing),
+                in: RoundedRectangle(cornerRadius: 17)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!ready || selectedResolution == nil)
+        .opacity((!ready || selectedResolution == nil) ? 0.52 : 1)
+    }
+
+    private var respringButton: some View {
+        Button {
+            confirmRespring = true
+        } label: {
+            Label("Respring", systemImage: "arrow.triangle.2.circlepath")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 59)
+                .background(cardBackground)
+        }
+        .buttonStyle(.plain)
+        .disabled(!restartRequired || busy)
+        .opacity((!restartRequired || busy) ? 0.52 : 1)
+    }
+
+    private var utilityActions: some View {
+        HStack(spacing: 12) {
             Button {
                 Task { await readCurrent() }
             } label: {
-                Label("Read current resolution", systemImage: "arrow.down.doc")
+                Label("Read current", systemImage: "arrow.down.doc")
                     .frame(maxWidth: .infinity)
+                    .frame(height: 44)
             }
-            .buttonStyle(.bordered)
             .disabled(!ready)
-
-            Button {
-                Task { await applyResolution() }
-            } label: {
-                HStack {
-                    if busy {
-                        ProgressView().tint(.black)
-                    } else {
-                        Image(systemName: "checkmark.circle.fill")
-                    }
-                    Text(busy ? "Working…" : "Apply resolution")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.cyan)
-            .disabled(!ready || selected == nil)
 
             Button {
                 Task { await restoreBackup() }
             } label: {
-                Label("Restore saved backup", systemImage: "arrow.uturn.backward")
+                Label("Restore backup", systemImage: "arrow.uturn.backward")
                     .frame(maxWidth: .infinity)
+                    .frame(height: 44)
             }
-            .buttonStyle(.bordered)
             .disabled(!ready || !BackupStore.hasBackup)
         }
+        .font(.system(size: 13, weight: .semibold))
+        .buttonStyle(.bordered)
+        .tint(.white.opacity(0.85))
     }
 
-    private var restartCard: some View {
-        VStack(alignment: .leading, spacing: 11) {
+    private var statusCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Image(systemName: "arrow.clockwise.circle.fill")
-                    .foregroundStyle(.cyan)
-                Text("Restart required")
-                    .font(.headline)
+                Text("DEVICE STATUS")
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.2)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 if restartRequired {
-                    Text("PENDING")
+                    Text("RESTART REQUIRED")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.orange)
                 }
             }
-
-            Text("After Apply succeeds, reboot the iPad manually. When it has started again, open this app and respring SpringBoard.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Button {
-                confirmRespring = true
-            } label: {
-                Label("Respring SpringBoard", systemImage: "arrow.triangle.2.circlepath")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
-            .disabled(!restartRequired || busy)
-        }
-        .padding(16)
-        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
-    }
-
-    private var statusCard: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text("DEVICE STATUS")
-                .font(.caption2.weight(.bold))
-                .tracking(1.2)
-                .foregroundStyle(.secondary)
-
             Text(currentResolution)
-                .font(.system(.body, design: .rounded).weight(.semibold))
-                .monospacedDigit()
-
+                .font(.system(size: 17, weight: .semibold, design: .rounded).monospacedDigit())
+                .foregroundStyle(.white)
             Text(status)
                 .font(.caption)
                 .foregroundStyle(isError ? .red : .secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
+        .padding(15)
+        .background(cardBackground)
     }
 
+    // MARK: - First launch notice
+
+    private var firstLaunchNotice: some View {
+        ZStack {
+            Color.black.opacity(0.78).ignoresSafeArea()
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        Text("خطوات تغيير الريزلوشن 🇸🇦")
+                            .font(.system(size: 19, weight: .bold))
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .environment(\.layoutDirection, .rightToLeft)
+
+                        Text("بعد ما تحفظ الريزلوشن الجديد بنجاح:")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .environment(\.layoutDirection, .rightToLeft)
+
+                        instructionRow("أعد تشغيل جهازك.", number: "1", rtl: true)
+                        instructionRow("افتح تطبيق 67.", number: "2", rtl: true)
+                        instructionRow("اضغط على Respring.", number: "3", rtl: true)
+
+                        Divider().overlay(Color.white.opacity(0.16))
+                            .padding(.vertical, 2)
+
+                        Text("Steps to Change Resolution 🇺🇸")
+                            .font(.system(size: 18, weight: .bold))
+                        Text("After successfully saving the new resolution:")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                        instructionRow("Reboot your device.", number: "1", rtl: false)
+                        instructionRow("Open 67.", number: "2", rtl: false)
+                        instructionRow("Tap Respring.", number: "3", rtl: false)
+                    }
+                    .padding(22)
+                }
+                .frame(maxHeight: 520)
+
+                Button {
+                    hasShownInstructions = true
+                    withAnimation(.easeOut(duration: 0.2)) { showInstructions = false }
+                } label: {
+                    Text("موافق")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 54)
+                        .background(
+                            LinearGradient(colors: [Color.blue, Color(red: 0.02, green: 0.34, blue: 0.95)],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing),
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 18)
+                .padding(.bottom, 18)
+            }
+            .frame(maxWidth: 460)
+            .background(
+                LinearGradient(colors: [Color(red: 0.08, green: 0.09, blue: 0.11),
+                                        Color(red: 0.025, green: 0.03, blue: 0.045)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing),
+                in: RoundedRectangle(cornerRadius: 24)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(Color.white.opacity(0.13), lineWidth: 1)
+            }
+            .padding(.horizontal, 20)
+        }
+    }
+
+    private func instructionRow(_ title: String, number: String, rtl: Bool) -> some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.system(size: 15, weight: .medium))
+                .frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading)
+            Text(number)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(Color.blue.gradient, in: Circle())
+        }
+        .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
+    }
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 17)
+            .fill(Color(red: 0.055, green: 0.065, blue: 0.085))
+            .overlay {
+                RoundedRectangle(cornerRadius: 17)
+                    .stroke(Color.white.opacity(0.075), lineWidth: 1)
+            }
+    }
+
+    // MARK: - Pairing
+
+    @MainActor
     private func importPairing(_ result: Result<[URL], Error>) {
         do {
             guard let url = try result.get().first else { return }
             let saved = try PairingStore.importFile(from: url)
             pairingName = saved.lastPathComponent
+            status = "Pairing file imported. Connect LocalDevVPN to continue."
             isError = false
-            status = "Pairing record imported. Enable LocalDevVPN to connect."
         } catch {
             present(error)
         }
     }
-
 
     @MainActor
     private func pairTargetDevice() async {
         busy = true
         defer { busy = false }
-
         do {
             let path = try await pairingController.startAndWait()
             let saved = try PairingStore.importFile(from: URL(fileURLWithPath: path))
             pairingName = saved.lastPathComponent
+            status = "Pairing succeeded. Connect LocalDevVPN to continue."
             isError = false
-            status = "Pairing succeeded. Enable LocalDevVPN, then read the current resolution."
         } catch {
             present(error)
         }
     }
+
+    // MARK: - Resolution operations
 
     @MainActor
     private func readCurrent() async {
@@ -424,22 +577,19 @@ struct ContentView: View {
             present(AirliftBridgeError.missingPairingFile)
             return
         }
-
         busy = true
         defer { busy = false }
-
         do {
             let data = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
             if let resolution = try ResolutionPlistEditor.values(from: data) {
                 currentResolution = resolution.displayValue
                 widthText = String(resolution.width)
                 heightText = String(resolution.height)
-                status = "Read succeeded. The existing restore backup was left unchanged."
+                status = "Current resolution read successfully."
+                isError = false
             } else {
-                currentResolution = "Canvas keys not found"
-                status = "The file was read, but canvas_width or canvas_height was not present."
+                throw ResolutionEditorError.invalidPropertyList
             }
-            isError = false
         } catch {
             present(error)
         }
@@ -451,7 +601,6 @@ struct ContentView: View {
             present(AirliftBridgeError.missingPairingFile)
             return
         }
-
         guard let width = Int(widthText), let height = Int(heightText) else {
             present(ResolutionEditorError.invalidNumber)
             return
@@ -469,20 +618,25 @@ struct ContentView: View {
             do {
                 try await AirliftBridge.writeDisplayConfiguration(modified, pairingURL: pairing)
                 let verified = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
-
                 guard let actual = try ResolutionPlistEditor.values(from: verified),
                       actual == CanvasResolution(width: width, height: height) else {
                     throw ResolutionEditorError.verificationFailed
                 }
             } catch {
-                try? await AirliftBridge.writeDisplayConfiguration(original, pairingURL: pairing)
+                do {
+                    try await AirliftBridge.writeDisplayConfiguration(original, pairingURL: pairing)
+                } catch let rollbackError {
+                    throw AirliftBridgeError.operationFailed(
+                        "Apply failed: \(error.localizedDescription). Automatic restore also failed: \(rollbackError.localizedDescription). Keep the device connected and restore the saved backup."
+                    )
+                }
                 throw error
             }
 
             currentResolution = "\(width) × \(height)"
             restartRequired = true
+            status = "Resolution saved and verified. Reboot the device, reopen 67, then tap Respring."
             isError = false
-            status = "The new values were written and read back successfully. Restart the iPad to load them."
         } catch {
             present(error)
         }
@@ -494,38 +648,33 @@ struct ContentView: View {
             present(AirliftBridgeError.missingPairingFile)
             return
         }
-
         busy = true
         defer { busy = false }
-
         do {
             let backup = try BackupStore.loadLatest()
             try await AirliftBridge.writeDisplayConfiguration(backup, pairingURL: pairing)
             let verified = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
             guard verified == backup else { throw ResolutionEditorError.verificationFailed }
-
             if let resolution = try ResolutionPlistEditor.values(from: verified) {
                 currentResolution = resolution.displayValue
             }
-
             restartRequired = true
+            status = "Original display configuration restored and verified. Reboot the device."
             isError = false
-            status = "The saved plist was restored and verified. Restart the iPad to load it."
         } catch {
             present(error)
         }
     }
 
-
     @MainActor
     private func runRespring() {
         guard NeoSpring.trigger() else {
-            present(AirliftBridgeError.operationFailed("Could not find an active app window for the respring view."))
+            present(AirliftBridgeError.operationFailed("The respring action could not be started. Reboot the device manually."))
             return
         }
         restartRequired = false
+        status = "Respring was triggered."
         isError = false
-        status = "SpringBoard respring was triggered."
     }
 
     @MainActor
