@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var isError = false
     @State private var busy = false
     @State private var importingPairing = false
+    @State private var confirmRespring = false
     @State private var alertMessage = ""
     @State private var showAlert = false
 
@@ -53,6 +54,18 @@ struct ContentView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(alertMessage)
+            }
+            .confirmationDialog(
+                "Respring SpringBoard?",
+                isPresented: $confirmRespring,
+                titleVisibility: .visible
+            ) {
+                Button("Respring SpringBoard", role: .destructive) {
+                    runRespring()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This uses Erosion's WebView respring method. The display may go black or freeze temporarily while SpringBoard restarts. Use it only after rebooting the iPad.")
             }
         }
         .tint(.cyan)
@@ -303,18 +316,19 @@ struct ContentView: View {
                 }
             }
 
-            Text("After applying or restoring the display configuration, restart the iPad manually to load the new canvas values. This build does not run the unstable WebView respring shortcut.")
+            Text("After Apply succeeds, reboot the iPad manually. When it has started again, open this app and respring SpringBoard.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            if restartRequired {
-                Button("I restarted the iPad") {
-                    restartRequired = false
-                    status = "Restart marked complete. Read the current resolution to verify the values."
-                    isError = false
-                }
-                .buttonStyle(.bordered)
+            Button {
+                confirmRespring = true
+            } label: {
+                Label("Respring SpringBoard", systemImage: "arrow.triangle.2.circlepath")
+                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.borderedProminent)
+            .tint(.orange)
+            .disabled(!restartRequired || busy)
         }
         .padding(16)
         .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
@@ -451,6 +465,18 @@ struct ContentView: View {
         } catch {
             present(error)
         }
+    }
+
+
+    @MainActor
+    private func runRespring() {
+        guard NeoSpring.trigger() else {
+            present(AirliftBridgeError.operationFailed("Could not find an active app window for the respring view."))
+            return
+        }
+        restartRequired = false
+        isError = false
+        status = "SpringBoard respring was triggered."
     }
 
     @MainActor
