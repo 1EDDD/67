@@ -51,6 +51,7 @@ struct DeviceResolutionPreset: Identifiable {
                     "iPad Air 11-inch (M2)", "iPad Air 11-inch (M3)", "iPad Air 11-inch (M4)"], 2360, 1640)
         add(.ipad, ["iPad Air 3", "iPad Pro 10.5-inch"], 2224, 1668)
         add(.ipad, ["iPad mini 6", "iPad mini (A17 Pro)"], 2266, 1488)
+        add(.ipad, ["iPad mini (A20 Pro)"], 2316, 1512)
         add(.ipad, ["iPad Pro 11-inch (1st generation)", "iPad Pro 11-inch (2nd generation)",
                     "iPad Pro 11-inch (3rd generation)", "iPad Pro 11-inch (4th generation)"], 2388, 1668)
         add(.ipad, ["iPad Pro 11-inch (M4)", "iPad Pro 11-inch (M5)"], 2420, 1668)
@@ -76,8 +77,8 @@ struct DeviceResolutionPreset: Identifiable {
         add(.iphone, ["iPhone 12 Pro Max", "iPhone 13 Pro Max", "iPhone 14 Plus"], 1284, 2778)
         add(.iphone, ["iPhone 14 Pro", "iPhone 15", "iPhone 15 Pro", "iPhone 16"], 1179, 2556)
         add(.iphone, ["iPhone 14 Pro Max", "iPhone 15 Plus", "iPhone 15 Pro Max",
-                      "iPhone 16 Plus", "iPhone 16 Pro Max", "iPhone 17 Pro Max",
-                      "iPhone 18 Pro Max"], 1290, 2796)
+                      "iPhone 16 Plus"], 1290, 2796)
+        add(.iphone, ["iPhone 16 Pro Max", "iPhone 17 Pro Max", "iPhone 18 Pro Max"], 1320, 2868)
         add(.iphone, ["iPhone 16 Pro", "iPhone 17", "iPhone 17 Pro", "iPhone 18 Pro"], 1206, 2622)
         add(.iphone, ["iPhone Air"], 1260, 2736)
         add(.iphone, ["iPhone Duo (outer display)"], 1398, 2034)
