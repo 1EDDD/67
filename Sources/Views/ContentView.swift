@@ -109,11 +109,8 @@ struct ContentView: View {
 
     private var mascotHeader: some View {
         VStack(spacing: 5) {
-            Image("Mascot")
-                .resizable()
-                .scaledToFit()
+            MascotView()
                 .frame(height: 132)
-                .accessibilityLabel("67 mascot")
         }
         .frame(maxWidth: .infinity)
         .padding(.bottom, 2)
