@@ -229,7 +229,10 @@ enum AirliftBridge {
 
     private static func configureTunnel() throws {
         try ensureGrappaProvider()
-        _ = targetHost.withCString { cSetTargetHost($0) }
+        let result = targetHost.withCString { cSetTargetHost($0) }
+        guard result == 0 else {
+            throw AirliftBridgeError.operationFailed("Airlift could not set the LocalDevVPN target (code \\(result)). Reconnect LocalDevVPN and try again.")
+        }
     }
 
     /// Keep ALGetGrappaToken linked into the app. Airlift resolves this symbol
@@ -308,6 +311,14 @@ enum AirliftBridge {
         guard result == 0 else {
             throw AirliftBridgeError.operationFailed(message ?? "Airlift write failed (code \(result)).")
         }
+    }
+
+    private static func friendlyError(_ message: String?, fallback: String) -> String {
+        guard let message else { return fallback }
+        if message.localizedCaseInsensitiveContains("channel closed") {
+            return message + "\\nThe AirTraffic channel closed before the operation finished. Verify the pairing record and LocalDevVPN connection, reconnect both, then retry."
+        }
+        return message
     }
 
     private static func consumeError(_ pointer: UnsafeMutablePointer<CChar>?) -> String? {
