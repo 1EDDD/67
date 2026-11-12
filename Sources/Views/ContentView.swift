@@ -12,7 +12,6 @@ struct ContentView: View {
     @State private var isError = false
     @State private var busy = false
     @State private var importingPairing = false
-    @State private var confirmRespring = false
     @State private var alertMessage = ""
     @State private var showAlert = false
 
@@ -46,12 +45,6 @@ struct ContentView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(alertMessage)
-            }
-            .confirmationDialog("Respring SpringBoard?", isPresented: $confirmRespring, titleVisibility: .visible) {
-                Button("Respring SpringBoard", role: .destructive) { runRespring() }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("The screen may go black briefly while SpringBoard restarts. This is not a full device reboot. Use this only after the iPad has rebooted with the new canvas values.")
             }
         }
         .tint(.cyan)
@@ -219,25 +212,23 @@ struct ContentView: View {
                     Text("PENDING").font(.caption2.weight(.bold)).foregroundStyle(.orange)
                 }
             }
-            Text("After Apply succeeds, reboot the iPad manually. When it has started again, open this app and respring SpringBoard.")
-                .font(.caption).foregroundStyle(.secondary)
-            Button { confirmRespring = true } label: {
-                Label("Respring SpringBoard", systemImage: "arrow.triangle.2.circlepath").frame(maxWidth: .infinity)
+            Text("After Apply succeeds, reboot the iPad manually. When it has st    private var respringCard: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                Image(systemName: "arrow.clockwise.circle.fill").foregroundStyle(.cyan)
+                Text("Apply changes").font(.headline)
+                Spacer()
+                if pendingRespring {
+                    Text("RESTART REQUIRED").font(.caption2.weight(.bold)).foregroundStyle(.orange)
+                }
             }
-            .buttonStyle(.borderedProminent).tint(.orange).disabled(!pendingRespring || busy)
+            Text("After applying or restoring the display configuration, restart the iPad manually to apply the new canvas values. This app does not force a SpringBoard restart.")
+                .font(.caption).foregroundStyle(.secondary)
         }
         .padding(16)
         .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
     }
-
-    private var statusCard: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text("DEVICE STATUS").font(.caption2.weight(.bold)).tracking(1.2).foregroundStyle(.secondary)
-            Text(currentResolution).font(.system(.body, design: .rounded).weight(.semibold)).monospacedDigit()
-            Text(status).font(.caption).foregroundStyle(isError ? .red : .secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading).padding(16)
+ng(16)
         .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
     }
 
@@ -332,16 +323,6 @@ struct ContentView: View {
         } catch { present(error) }
     }
 
-    @MainActor
-    private func runRespring() {
-        guard NeoSpring.trigger() else {
-            present(AirliftBridgeError.operationFailed("Could not find an active app window for the respring view."))
-            return
-        }
-        pendingRespring = false
-        isError = false
-        status = "SpringBoard respring was triggered."
-    }
 
     @MainActor
     private func present(_ error: Error) {
