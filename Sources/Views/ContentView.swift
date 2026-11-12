@@ -47,7 +47,7 @@ struct ContentView: View {
                     utilityActions
                     statusCard
                 }
-                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 18)
                 .padding(.top, 14)
                 .padding(.bottom, 30)
