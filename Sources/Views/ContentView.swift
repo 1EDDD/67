@@ -110,14 +110,9 @@ struct ContentView: View {
                                     .foregroundStyle(.secondary)
                             }
 
-                            Button {
-                                guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-                                UIApplication.shared.open(url)
-                            } label: {
-                                Label("Open Settings to Pair with 67", systemImage: "arrow.up.forward.app")
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.tint)
+                            Text("On your device: Settings → Privacy & Security → Developer Mode → Pair with 67")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
 
                             if let pin = pairingController.pairingPIN {
                                 VStack(alignment: .leading, spacing: 10) {
@@ -138,10 +133,6 @@ struct ContentView: View {
                                         .buttonStyle(.plain)
                                         .foregroundStyle(.tint)
                                     }
-
-                                    Text("Settings → Privacy & Security → Developer Mode → Pair with 67")
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
 
                                 }
                                 .padding(14)
