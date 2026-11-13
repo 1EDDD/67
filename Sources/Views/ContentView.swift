@@ -110,6 +110,15 @@ struct ContentView: View {
                                     .foregroundStyle(.secondary)
                             }
 
+                            Button {
+                                guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                                UIApplication.shared.open(url)
+                            } label: {
+                                Label("Open Settings to Pair with 67", systemImage: "arrow.up.forward.app")
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.tint)
+
                             if let pin = pairingController.pairingPIN {
                                 VStack(alignment: .leading, spacing: 10) {
                                     Text("VERIFICATION CODE")
@@ -134,14 +143,6 @@ struct ContentView: View {
                                         .font(.footnote)
                                         .foregroundStyle(.secondary)
 
-                                    Button {
-                                        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-                                        UIApplication.shared.open(url)
-                                    } label: {
-                                        Label("Open Settings", systemImage: "arrow.up.forward.app")
-                                    }
-                                    .buttonStyle(.plain)
-                                    .foregroundStyle(.tint)
                                 }
                                 .padding(14)
                                 .background(Color(uiColor: .tertiarySystemGroupedBackground))
