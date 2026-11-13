@@ -110,8 +110,9 @@ struct DeviceResolutionPreset: Identifiable {
 
         add(.ipad, ["iPad (9th generation)", "iPad (8th generation)", "iPad (7th generation)"], 2160, 1620)
         add(.ipad, ["iPad mini 5", "iPad mini 4", "iPad mini 3", "iPad mini 2",
-                    "iPad Air 2", "iPad Air (1st generation)",
-                    "iPad (6th generation)", "iPad (5th generation)"], 2048, 1536)
+                    "iPad Pro 9.7-inch", "iPad Air 2", "iPad Air (1st generation)",
+                    "iPad (6th generation)", "iPad (5th generation)",
+                    "iPad (4th generation)", "iPad (3rd generation)"], 2048, 1536)
         add(.ipad, ["iPad mini (1st generation)", "iPad 2", "iPad (1st generation)"], 1024, 768)
 
         return values
