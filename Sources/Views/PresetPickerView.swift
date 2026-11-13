@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct PresetPickerView: View {
     let onSelect: (DeviceResolutionPreset) -> Void
