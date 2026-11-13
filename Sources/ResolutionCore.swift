@@ -174,6 +174,9 @@ private func cGetGrappaToken(
 @_silgen_name("al_set_target_host")
 private func cSetTargetHost(_ host: UnsafePointer<CChar>?) -> Int32
 
+@_silgen_name("al_set_target_hosts")
+private func cSetTargetHosts(_ hosts: UnsafePointer<UnsafePointer<CChar>?>?, _ count: Int) -> Int32
+
 @_silgen_name("al_exploit_read_file")
 private func cReadFile(
     _ pairingPath: UnsafePointer<CChar>?, _ iosPath: UnsafePointer<CChar>?,
@@ -208,10 +211,33 @@ enum AirliftBridgeError: LocalizedError {
     }
 }
 
+private final class AirliftLogBuffer {
+    private let lock = NSLock()
+    private var storage: [String] = []
+
+    func append(_ line: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        storage.append(line)
+    }
+
+    func snapshot() -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+}
+
+private let airliftLogCallback: AirliftLogCallback = { context, message in
+    guard let context, let message else { return }
+    let buffer = Unmanaged<AirliftLogBuffer>.fromOpaque(context).takeUnretainedValue()
+    buffer.append(String(cString: message))
+}
+
 enum AirliftBridge {
     static let targetFile = "/var/mobile/Library/Preferences/com.apple.iokit.IOMobileGraphicsFamily.plist"
     private static let targetDirectory = "/var/mobile/Library/Preferences"
-    private static let targetHost = "10.7.0.1"
+    private static let targetHost = NetworkStatus.targetHost
 
     static func readDisplayConfiguration(pairingURL: URL?) async throws -> Data {
         guard let pairingURL else { throw AirliftBridgeError.missingPairingFile }
@@ -229,15 +255,41 @@ enum AirliftBridge {
 
     private static func configureTunnel() throws {
         try ensureGrappaProvider()
-        let result = targetHost.withCString { cSetTargetHost($0) }
-        guard result == 0 else {
-            throw AirliftBridgeError.operationFailed("Airlift could not set the LocalDevVPN target (code " + String(result) + "). Reconnect LocalDevVPN and try again.")
+
+        let primaryResult = targetHost.withCString { cSetTargetHost($0) }
+        guard primaryResult == 0 else {
+            throw AirliftBridgeError.operationFailed(
+                "Airlift could not configure its primary VPN target (code \(primaryResult))."
+            )
+        }
+
+        // AirCard's Airlift dialer supports multiple host candidates. Supplying
+        // the active Wi-Fi/LAN addresses avoids relying on a single hard-coded IP.
+        let candidates = NetworkStatus.tunnelHostCandidates()
+        let allocated = candidates.map { strdup($0) }
+        defer {
+            allocated.forEach { pointer in
+                if let pointer { free(pointer) }
+            }
+        }
+
+        let pointers: [UnsafePointer<CChar>?] = allocated.map { pointer in
+            pointer.map { UnsafePointer($0) }
+        }
+        if !pointers.isEmpty {
+            let result = pointers.withUnsafeBufferPointer { buffer in
+                cSetTargetHosts(buffer.baseAddress, buffer.count)
+            }
+            guard result == 0 else {
+                throw AirliftBridgeError.operationFailed(
+                    "Airlift could not register network host candidates (code \(result))."
+                )
+            }
         }
     }
 
-    /// Keep ALGetGrappaToken linked into the app. Airlift resolves this symbol
-    /// dynamically during the AirTraffic sync, so a normal static reference is
-    /// needed even though the Rust library calls it through dlsym.
+    /// Force-link the Grappa token provider. Airlift resolves this symbol dynamically
+    /// when the AirTraffic sync negotiates the device's advertised Grappa version.
     private static func ensureGrappaProvider() throws {
         var token = [UInt8](repeating: 0, count: 512)
         var tokenLength = 0
@@ -263,27 +315,38 @@ enum AirliftBridge {
                 pointer.baseAddress.map { String(cString: $0) } ?? "unknown Grappa error"
             }
             throw AirliftBridgeError.operationFailed(
-                "Grappa token provider unavailable: " + message + " (code " + String(result) + ")."
+                "Grappa token provider unavailable: \(message) (code \(result))."
             )
         }
     }
 
     private static func readSynchronously(pairingPath: String, remotePath: String) throws -> Data {
         try configureTunnel()
+        let logs = AirliftLogBuffer()
+        let context = Unmanaged.passUnretained(logs).toOpaque()
+
         var output: UnsafeMutablePointer<UInt8>?
         var outputLength = 0
         var outputError: UnsafeMutablePointer<CChar>?
 
         let result = pairingPath.withCString { pairing in
             remotePath.withCString { path in
-                cReadFile(pairing, path, nil, nil, &output, &outputLength, &outputError)
+                cReadFile(
+                    pairing,
+                    path,
+                    airliftLogCallback,
+                    context,
+                    &output,
+                    &outputLength,
+                    &outputError
+                )
             }
         }
 
         let message = consumeError(outputError)
         guard result == 0, let output else {
             throw AirliftBridgeError.operationFailed(
-                friendlyError(message, fallback: "Airlift read failed (code \(result)).")
+                diagnosticError(message, fallback: "Airlift read failed (code \(result)).", logs: logs)
             )
         }
 
@@ -300,11 +363,21 @@ enum AirliftBridge {
         defer { try? FileManager.default.removeItem(at: stage) }
         try data.write(to: stage.appendingPathComponent(leaf), options: .atomic)
 
+        let logs = AirliftLogBuffer()
+        let context = Unmanaged.passUnretained(logs).toOpaque()
         var outputError: UnsafeMutablePointer<CChar>?
+
         let result = pairingPath.withCString { pairing in
             stage.path.withCString { source in
                 targetDirectory.withCString { target in
-                    cWriteDirectory(pairing, source, target, nil, nil, &outputError)
+                    cWriteDirectory(
+                        pairing,
+                        source,
+                        target,
+                        airliftLogCallback,
+                        context,
+                        &outputError
+                    )
                 }
             }
         }
@@ -312,15 +385,26 @@ enum AirliftBridge {
         let message = consumeError(outputError)
         guard result == 0 else {
             throw AirliftBridgeError.operationFailed(
-                friendlyError(message, fallback: "Airlift write failed (code \(result)).")
+                diagnosticError(message, fallback: "Airlift write failed (code \(result)).", logs: logs)
             )
         }
+    }
+
+    private static func diagnosticError(
+        _ message: String?,
+        fallback: String,
+        logs: AirliftLogBuffer
+    ) -> String {
+        let primary = friendlyError(message, fallback: fallback)
+        let trace = logs.snapshot().suffix(14).joined(separator: "\n")
+        guard !trace.isEmpty else { return primary }
+        return primary + "\n\nAirlift diagnostic log:\n" + trace
     }
 
     private static func friendlyError(_ message: String?, fallback: String) -> String {
         guard let message else { return fallback }
         if message.localizedCaseInsensitiveContains("channel closed") {
-            return message + "\nThe AirTraffic channel closed before the operation finished. Verify the pairing record and LocalDevVPN connection, reconnect both, then retry."
+            return message + "\nAirTraffic closed its channel. The diagnostic log below identifies the last successful Airlift stage; VPN route detection alone does not prove the device session is alive."
         }
         return message
     }
