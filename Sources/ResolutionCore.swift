@@ -240,26 +240,30 @@ enum AirliftBridge {
     // Nugget's resolution editor uses the same canonical location.
     static let targetFile = "/var/Managed Preferences/mobile/com.apple.iokit.IOMobileGraphicsFamily.plist"
     private static let targetDirectory = "/var/Managed Preferences/mobile"
-    private static let targetHost = NetworkStatus.targetHost
-
-    static func readDisplayConfiguration(pairingURL: URL?) async throws -> Data {
+    static func readDisplayConfiguration(pairingURL: URL?, targetHost: String) async throws -> Data {
         guard let pairingURL else { throw AirliftBridgeError.missingPairingFile }
         return try await Task.detached(priority: .userInitiated) {
-            try readSynchronously(pairingPath: pairingURL.path, remotePath: targetFile)
+            try readSynchronously(pairingPath: pairingURL.path, remotePath: targetFile, targetHost: targetHost)
         }.value
     }
 
-    static func writeDisplayConfiguration(_ data: Data, pairingURL: URL?) async throws {
+    static func writeDisplayConfiguration(_ data: Data, pairingURL: URL?, targetHost: String) async throws {
         guard let pairingURL else { throw AirliftBridgeError.missingPairingFile }
         try await Task.detached(priority: .userInitiated) {
-            try writeSynchronously(data, pairingPath: pairingURL.path, remotePath: targetFile)
+            try writeSynchronously(data, pairingPath: pairingURL.path, remotePath: targetFile, targetHost: targetHost)
         }.value
     }
 
-    private static func configureTunnel() throws {
+    private static func configureTunnel(targetHost: String) throws {
         try ensureGrappaProvider()
 
-        let primaryResult = targetHost.withCString { cSetTargetHost($0) }
+        let normalizedHost = targetHost.trimmingCharacters(in: .whitespacesAndNewlines)
+        var address = in_addr()
+        guard normalizedHost.withCString({ inet_pton(AF_INET, $0, &address) }) == 1 else {
+            throw AirliftBridgeError.operationFailed("Enter a valid IPv4 connection address, for example 10.7.1.1.")
+        }
+
+        let primaryResult = normalizedHost.withCString { cSetTargetHost($0) }
         guard primaryResult == 0 else {
             throw AirliftBridgeError.operationFailed(
                 "Airlift could not configure its primary VPN target (code \(primaryResult))."
@@ -323,8 +327,8 @@ enum AirliftBridge {
         }
     }
 
-    private static func readSynchronously(pairingPath: String, remotePath: String) throws -> Data {
-        try configureTunnel()
+    private static func readSynchronously(pairingPath: String, remotePath: String, targetHost: String) throws -> Data {
+        try configureTunnel(targetHost: targetHost)
         let logs = AirliftLogBuffer()
         let context = Unmanaged.passUnretained(logs).toOpaque()
 
@@ -357,8 +361,8 @@ enum AirliftBridge {
         return Data(bytes: output, count: outputLength)
     }
 
-    private static func writeSynchronously(_ data: Data, pairingPath: String, remotePath: String) throws {
-        try configureTunnel()
+    private static func writeSynchronously(_ data: Data, pairingPath: String, remotePath: String, targetHost: String) throws {
+        try configureTunnel(targetHost: targetHost)
         let leaf = URL(fileURLWithPath: remotePath).lastPathComponent
         let stage = FileManager.default.temporaryDirectory
             .appendingPathComponent("67-Airlift-\(UUID().uuidString)", isDirectory: true)
