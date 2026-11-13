@@ -339,26 +339,23 @@ struct ContentView: View {
                             .frame(maxWidth: .infinity, alignment: .trailing)
                             .environment(\.layoutDirection, .rightToLeft)
 
-                        Text("بعد ما تحفظ الريزلوشن الجديد بنجاح:")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                            .environment(\.layoutDirection, .rightToLeft)
-
-                        instructionRow("أعد تشغيل جهازك.", number: "1", rtl: true)
-                        instructionRow("افتح تطبيق 67.", number: "2", rtl: true)
-                        instructionRow("اضغط على Respring.", number: "3", rtl: true)
+                        instructionRow("اضغط Read device لقراءة الريزلوشن الحالي.", number: "1", rtl: true)
+                        instructionRow("عدّل Width وHeight أو اختر Presets.", number: "2", rtl: true)
+                        instructionRow("اضغط Apply Resolution.", number: "3", rtl: true)
+                        instructionRow("أعد تشغيل جهازك.", number: "4", rtl: true)
+                        instructionRow("افتح تطبيق 67.", number: "5", rtl: true)
+                        instructionRow("اضغط Respring.", number: "6", rtl: true)
 
                         Divider().padding(.vertical, 2)
 
                         Text("Steps to Change Resolution 🇺🇸")
                             .font(.system(size: 18, weight: .bold))
-                        Text("After successfully saving the new resolution:")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.secondary)
-                        instructionRow("Reboot your device.", number: "1", rtl: false)
-                        instructionRow("Open 67.", number: "2", rtl: false)
-                        instructionRow("Tap Respring.", number: "3", rtl: false)
+                        instructionRow("Tap Read device to load the current resolution.", number: "1", rtl: false)
+                        instructionRow("Edit Width and Height, or choose Presets.", number: "2", rtl: false)
+                        instructionRow("Tap Apply Resolution.", number: "3", rtl: false)
+                        instructionRow("Restart your device.", number: "4", rtl: false)
+                        instructionRow("Open 67.", number: "5", rtl: false)
+                        instructionRow("Tap Respring.", number: "6", rtl: false)
                     }
                     .padding(22)
                 }
