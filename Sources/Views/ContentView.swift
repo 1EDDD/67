@@ -408,6 +408,11 @@ struct ContentView: View {
         do {
             guard let url = try result.get().first else { return }
             let saved = try PairingStore.importFile(from: url)
+            hasReadDevice = false
+            widthText = ""
+            heightText = ""
+            currentResolution = "—"
+            airliftStatus = "Not verified"
             pairingName = saved.lastPathComponent
             statusMessage = "Pairing file imported."
             hasError = false
@@ -421,6 +426,11 @@ struct ContentView: View {
         do {
             let path = try await pairingController.startAndWait()
             let saved = try PairingStore.importFile(from: URL(fileURLWithPath: path))
+            hasReadDevice = false
+            widthText = ""
+            heightText = ""
+            currentResolution = "—"
+            airliftStatus = "Not verified"
             pairingName = saved.lastPathComponent
             statusMessage = "Pairing succeeded. Read the device to verify the Airlift connection."
             hasError = false
