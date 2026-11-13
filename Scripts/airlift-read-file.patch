@@ -362,7 +362,6 @@ index a759c80..664b5a9 100644
 +        restore_books_snapshot(&mut afc, &original_books_plist, logger).await;
 +        logger.log(format!("airlift: read {} bytes from {ios_path}", data.len()));
 +        Ok(data)
-+    }
 +    }.await;
 +
 +    if operation.is_err() {
