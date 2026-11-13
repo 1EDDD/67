@@ -6,54 +6,231 @@ struct ContentView: View {
     @AppStorage("hasShown67Instructions") private var hasShownInstructions = false
     @AppStorage("pendingSpringBoardRespring") private var restartRequired = false
 
+    @State private var pairingName = PairingStore.currentFileName
     @State private var widthText = ""
     @State private var heightText = ""
     @State private var currentResolution = "—"
-    @State private var status = "Pair your device or import a pairing file."
-    @State private var pairingName = PairingStore.currentFileName
-    @State private var vpnConnected = false
-    @State private var busy = false
+
+    @State private var vpnRouteDetected = false
+    @State private var airliftStatus = "Not verified"
+    @State private var isReading = false
+    @State private var isApplying = false
+    @State private var isRestoring = false
     @State private var importingPairing = false
-    @State private var showInstructions = false
-    @State private var showPresets = false
-    @State private var selectedPresetCategory: PresetDeviceCategory?
-    @State private var confirmRespring = false
-    @State private var showAlert = false
-    @State private var alertMessage = ""
-    @State private var isError = false
+    @State private var showingPresets = false
+    @State private var showingInstructions = false
+    @State private var confirmingRespring = false
+    @State private var showingError = false
+    @State private var errorTitle = "67"
+    @State private var errorMessage = ""
+    @State private var statusMessage = ""
+    @State private var hasError = false
+    @State private var hasReadDevice = false
 
     private var selectedResolution: CanvasResolution? {
         guard let width = Int(widthText), let height = Int(heightText) else { return nil }
         return CanvasResolution(width: width, height: height)
     }
 
-    private var ready: Bool {
-        PairingStore.currentURL != nil && vpnConnected && !busy
+    private var canStartAirlift: Bool {
+        PairingStore.currentURL != nil && vpnRouteDetected && !isReading && !isApplying && !isRestoring
+    }
+
+    private var isBusy: Bool {
+        isReading || isApplying || isRestoring || pairingController.running
     }
 
     var body: some View {
-        ZStack {
-            Color(red: 0.015, green: 0.018, blue: 0.027).ignoresSafeArea()
-
-            ScrollView {
-                VStack(spacing: 16) {
-                    mascotHeader
-                    resolutionFields
-                    presetsButton
-                    pairingCard
-                    vpnCard
-                    applyButton
-                    respringButton
-                    utilityActions
-                    statusCard
+        NavigationStack {
+            List {
+                Section {
+                    HStack(spacing: 14) {
+                        Image("Mascot")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 82, height: 66)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("67")
+                                .font(.title2.weight(.bold))
+                                .foregroundStyle(.primary)
+                            Text("Resolution")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 3)
+                    .listRowBackground(Color.clear)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 18)
-                .padding(.top, 14)
-                .padding(.bottom, 30)
-                .frame(maxWidth: .infinity)
+
+                Section("PAIRING") {
+                    HStack(alignment: .center) {
+                        Label("Pairing file", systemImage: "doc.text")
+                        Spacer(minLength: 8)
+                        Text(pairingName)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+
+                    HStack(spacing: 12) {
+                        Button {
+                            importingPairing = true
+                        } label: {
+                            Label("Import file", systemImage: "folder")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .disabled(isBusy)
+
+                        Button {
+                            Task { await pairTargetDevice() }
+                        } label: {
+                            HStack(spacing: 6) {
+                                if pairingController.running {
+                                    ProgressView()
+                                } else {
+                                    Image(systemName: "link")
+                                }
+                                Text(pairingController.running ? "Pairing…" : "Pair")
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .disabled(isBusy)
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Section("CONNECTION") {
+                    statusRow(
+                        title: "VPN route",
+                        icon: "network",
+                        value: vpnRouteDetected ? "Route detected" : "No route",
+                        good: vpnRouteDetected
+                    )
+
+                    statusRow(
+                        title: "Airlift",
+                        icon: "arrow.left.arrow.right",
+                        value: airliftStatus,
+                        good: hasReadDevice
+                    )
+
+                    Button {
+                        Task { await readCurrent() }
+                    } label: {
+                        HStack {
+                            if isReading {
+                                ProgressView()
+                                    .padding(.trailing, 4)
+                            } else {
+                                Image(systemName: "arrow.down.doc")
+                                    .foregroundStyle(.tint)
+                            }
+                            Text(isReading ? "Reading device…" : "Read device")
+                            Spacer()
+                            if hasReadDevice {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            }
+                        }
+                    }
+                    .disabled(!canStartAirlift)
+                }
+
+                if hasReadDevice {
+                    Section("DEVICE RESOLUTION") {
+                        HStack {
+                            Text("Current")
+                            Spacer()
+                            Text(currentResolution)
+                                .font(.body.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+
+                        HStack(spacing: 12) {
+                            dimensionField(title: "Width", value: $widthText)
+                            dimensionField(title: "Height", value: $heightText)
+                        }
+                        .listRowSeparator(.hidden)
+
+                        Button {
+                            showingPresets = true
+                        } label: {
+                            Label("Presets", systemImage: "rectangle.on.rectangle")
+                        }
+                        .disabled(isBusy)
+
+                        Button {
+                            Task { await applyResolution() }
+                        } label: {
+                            HStack {
+                                if isApplying {
+                                    ProgressView().padding(.trailing, 4)
+                                }
+                                Text(isApplying ? "Applying…" : "Apply Resolution")
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        .disabled(!canStartAirlift || selectedResolution == nil)
+                    }
+                } else {
+                    Section("DEVICE RESOLUTION") {
+                        Label("Read the device first to show and edit its resolution.", systemImage: "info.circle")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Section("SYSTEM") {
+                    if BackupStore.hasBackup {
+                        Button {
+                            Task { await restoreBackup() }
+                        } label: {
+                            HStack {
+                                if isRestoring {
+                                    ProgressView().padding(.trailing, 4)
+                                }
+                                Label("Restore backup", systemImage: "arrow.uturn.backward")
+                            }
+                        }
+                        .disabled(!canStartAirlift)
+                    }
+
+                    if restartRequired {
+                        Button(role: .destructive) {
+                            confirmingRespring = true
+                        } label: {
+                            Label("Respring", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                        .disabled(isBusy)
+                    }
+                }
+
+                if !statusMessage.isEmpty {
+                    Section("STATUS") {
+                        if hasError {
+                            DisclosureGroup("Connection details") {
+                                Text(statusMessage)
+                                    .font(.footnote.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                            }
+                        } else {
+                            Text(statusMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
             }
-            .scrollIndicators(.hidden)
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color(uiColor: .systemGroupedBackground))
+            .navigationTitle("67")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
         }
         .preferredColorScheme(.dark)
         .fileImporter(
@@ -63,29 +240,33 @@ struct ContentView: View {
         ) { result in
             importPairing(result)
         }
-        .sheet(isPresented: $showPresets, onDismiss: { selectedPresetCategory = nil }) {
-            presetsSheet
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .preferredColorScheme(.dark)
+        .sheet(isPresented: $showingPresets) {
+            PresetPickerView { preset in
+                widthText = String(preset.resolution.width)
+                heightText = String(preset.resolution.height)
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
-        .alert("67", isPresented: $showAlert) {
+        .alert(errorTitle, isPresented: $showingError) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(alertMessage)
+            Text(errorMessage)
         }
         .confirmationDialog(
             "Respring SpringBoard?",
-            isPresented: $confirmRespring,
+            isPresented: $confirmingRespring,
             titleVisibility: .visible
         ) {
-            Button("Respring", role: .destructive) { runRespring() }
+            Button("Respring", role: .destructive) {
+                runRespring()
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Use this only after saving the resolution and rebooting the device. SpringBoard may briefly disappear while it restarts.")
+            Text("Use this after applying the new resolution and restarting the device.")
         }
         .overlay {
-            if showInstructions {
+            if showingInstructions {
                 firstLaunchNotice
                     .transition(.opacity)
                     .zIndex(10)
@@ -93,357 +274,59 @@ struct ContentView: View {
         }
         .task {
             if !hasShownInstructions {
-                showInstructions = true
+                showingInstructions = true
             }
+
             while !Task.isCancelled {
-                vpnConnected = NetworkStatus.localDevVPNIsConnected()
+                let found = NetworkStatus.hasVPNRoute()
+                if found != vpnRouteDetected {
+                    vpnRouteDetected = found
+                    if !found {
+                        airliftStatus = "VPN route unavailable"
+                    } else if !hasReadDevice {
+                        airliftStatus = "Not verified"
+                    }
+                }
                 try? await Task.sleep(for: .seconds(2))
             }
         }
-        .onChange(of: PairingStore.currentURL) { _, url in
-            pairingName = url?.lastPathComponent ?? "No pairing file"
+        .onChange(of: pairingName) { _, _ in
+            hasReadDevice = false
+            widthText = ""
+            heightText = ""
+            currentResolution = "—"
+            airliftStatus = "Not verified"
         }
     }
 
-    // MARK: - Header
-
-    private var mascotHeader: some View {
-        VStack(spacing: 5) {
-            Image("Mascot")
-                .resizable()
-                .scaledToFit()
-                .frame(height: 132)
-                .accessibilityLabel("67 mascot")
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.bottom, 2)
-    }
-
-    // MARK: - Resolution editor
-
-    private var resolutionFields: some View {
-        HStack(spacing: 12) {
-            dimensionField(title: "Width", value: $widthText)
-            dimensionField(title: "Height", value: $heightText)
+    private func statusRow(title: String, icon: String, value: String, good: Bool) -> some View {
+        HStack {
+            Label(title, systemImage: icon)
+            Spacer()
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(good ? Color.green : Color.secondary.opacity(0.6))
+                    .frame(width: 7, height: 7)
+                Text(value)
+                    .font(.footnote)
+                    .foregroundStyle(good ? Color.green : Color.secondary)
+            }
         }
     }
 
     private func dimensionField(title: String, value: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.caption)
                 .foregroundStyle(.secondary)
-            TextField("", text: value)
-                .font(.system(size: 23, weight: .semibold, design: .rounded).monospacedDigit())
+            TextField(title, text: value)
+                .font(.title3.monospacedDigit())
                 .keyboardType(.numberPad)
-                .textFieldStyle(.plain)
-                .frame(height: 48)
-                .padding(.horizontal, 13)
-                .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 13))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 13)
-                        .stroke(Color.white.opacity(0.07), lineWidth: 1)
-                }
+                .textFieldStyle(.roundedBorder)
                 .accessibilityLabel(title)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(cardBackground)
     }
-
-    private var presetsButton: some View {
-        Button {
-            selectedPresetCategory = nil
-            showPresets = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "rectangle.on.rectangle")
-                    .font(.system(size: 19, weight: .medium))
-                    .frame(width: 25)
-                Text("Presets")
-                    .font(.system(size: 17, weight: .semibold))
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 17)
-            .frame(height: 58)
-            .background(cardBackground)
-        }
-        .buttonStyle(.plain)
-        .disabled(busy)
-    }
-
-    private var presetsSheet: some View {
-        NavigationStack {
-            Group {
-                if let category = selectedPresetCategory {
-                    List(DeviceResolutionPreset.all.filter { $0.category == category }) { preset in
-                        Button {
-                            widthText = String(preset.resolution.width)
-                            heightText = String(preset.resolution.height)
-                            showPresets = false
-                        } label: {
-                            HStack(spacing: 12) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(preset.name)
-                                        .foregroundStyle(.primary)
-                                    Text(preset.resolution.displayValue)
-                                        .font(.caption.monospacedDigit())
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if selectedResolution == preset.resolution {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.blue)
-                                }
-                            }
-                            .padding(.vertical, 3)
-                        }
-                        .listRowBackground(Color.white.opacity(0.045))
-                    }
-                    .listStyle(.plain)
-                } else {
-                    VStack(spacing: 14) {
-                        categoryButton(.ipad, subtitle: "Landscape presets")
-                        categoryButton(.iphone, subtitle: "Portrait presets")
-                    }
-                    .padding(20)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(red: 0.025, green: 0.03, blue: 0.045))
-                }
-            }
-            .navigationTitle(selectedPresetCategory?.rawValue ?? "Presets")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    if selectedPresetCategory != nil {
-                        Button("Back") { selectedPresetCategory = nil }
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { showPresets = false }
-                }
-            }
-        }
-    }
-
-    private func categoryButton(_ category: PresetDeviceCategory, subtitle: String) -> some View {
-        Button {
-            selectedPresetCategory = category
-        } label: {
-            HStack(spacing: 14) {
-                Image(systemName: category == .ipad ? "ipad.landscape" : "iphone")
-                    .font(.system(size: 24))
-                    .foregroundStyle(Color.cyan)
-                    .frame(width: 38)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(category.rawValue)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .foregroundStyle(.secondary)
-            }
-            .padding(18)
-            .background(cardBackground)
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Pairing & VPN
-
-    private var pairingCard: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Image(systemName: "link")
-                    .font(.system(size: 19, weight: .medium))
-                    .frame(width: 25)
-                Text("Pairing")
-                    .font(.system(size: 17, weight: .semibold))
-                Spacer()
-                Button {
-                    importingPairing = true
-                } label: {
-                    Label("File", systemImage: "doc")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(minWidth: 86, minHeight: 42)
-                        .background(Color.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 11))
-                }
-                .disabled(busy || pairingController.running)
-
-                Button {
-                    Task { await pairTargetDevice() }
-                } label: {
-                    HStack(spacing: 7) {
-                        if pairingController.running {
-                            ProgressView().tint(.white)
-                        } else {
-                            Image(systemName: "link")
-                        }
-                        Text(pairingController.running ? "Pairing…" : "Pair")
-                    }
-                    .font(.system(size: 14, weight: .semibold))
-                    .frame(minWidth: 86, minHeight: 42)
-                    .background(Color.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 11))
-                }
-                .disabled(busy || pairingController.running)
-            }
-            .foregroundStyle(.white)
-            .padding(15)
-
-            if !pairingName.isEmpty || pairingController.running || pairingController.pairingStatus != "idle" {
-                Divider().overlay(Color.white.opacity(0.06))
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(pairingName)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                    if pairingController.running || pairingController.pairingStatus != "idle" {
-                        Text(pairingController.pairingStatus)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        if let pin = pairingController.pairingPIN {
-                            Text(pin)
-                                .font(.system(size: 28, weight: .bold, design: .rounded).monospacedDigit())
-                                .foregroundStyle(.cyan)
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14)
-            }
-        }
-        .background(cardBackground)
-    }
-
-    private var vpnCard: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "point.3.connected.trianglepath.dotted")
-                .font(.system(size: 20))
-                .frame(width: 25)
-            Text("LocalDevVPN")
-                .font(.system(size: 17, weight: .semibold))
-            Spacer()
-            Circle()
-                .fill(vpnConnected ? Color.green : Color.gray)
-                .frame(width: 9, height: 9)
-            Text(vpnConnected ? "Connected" : "Disconnected")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(vpnConnected ? Color.green : Color.secondary)
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 17)
-        .frame(height: 60)
-        .background(cardBackground)
-        .accessibilityElement(children: .combine)
-    }
-
-    // MARK: - Actions
-
-    private var applyButton: some View {
-        Button {
-            Task { await applyResolution() }
-        } label: {
-            HStack(spacing: 10) {
-                if busy {
-                    ProgressView().tint(.white)
-                } else {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 18, weight: .bold))
-                }
-                Text(busy ? "Working…" : "Apply Resolution")
-                    .font(.system(size: 17, weight: .bold))
-            }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 63)
-            .background(
-                LinearGradient(colors: [Color(red: 0.08, green: 0.58, blue: 1),
-                                        Color(red: 0.02, green: 0.31, blue: 0.98)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing),
-                in: RoundedRectangle(cornerRadius: 17)
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(!ready || selectedResolution == nil)
-        .opacity((!ready || selectedResolution == nil) ? 0.52 : 1)
-    }
-
-    private var respringButton: some View {
-        Button {
-            confirmRespring = true
-        } label: {
-            Label("Respring", systemImage: "arrow.triangle.2.circlepath")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 59)
-                .background(cardBackground)
-        }
-        .buttonStyle(.plain)
-        .disabled(!restartRequired || busy)
-        .opacity((!restartRequired || busy) ? 0.52 : 1)
-    }
-
-    private var utilityActions: some View {
-        HStack(spacing: 12) {
-            Button {
-                Task { await readCurrent() }
-            } label: {
-                Label("Read current", systemImage: "arrow.down.doc")
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-            }
-            .disabled(!ready)
-
-            Button {
-                Task { await restoreBackup() }
-            } label: {
-                Label("Restore backup", systemImage: "arrow.uturn.backward")
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-            }
-            .disabled(!ready || !BackupStore.hasBackup)
-        }
-        .font(.system(size: 13, weight: .semibold))
-        .buttonStyle(.bordered)
-        .tint(.white.opacity(0.85))
-    }
-
-    private var statusCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("DEVICE STATUS")
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if restartRequired {
-                    Text("RESTART REQUIRED")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(.orange)
-                }
-            }
-            Text(currentResolution)
-                .font(.system(size: 17, weight: .semibold, design: .rounded).monospacedDigit())
-                .foregroundStyle(.white)
-            Text(status)
-                .font(.caption)
-                .foregroundStyle(isError ? Color.red : Color.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(15)
-        .background(cardBackground)
-    }
-
-    // MARK: - First launch notice
 
     private var firstLaunchNotice: some View {
         ZStack {
@@ -466,8 +349,7 @@ struct ContentView: View {
                         instructionRow("افتح تطبيق 67.", number: "2", rtl: true)
                         instructionRow("اضغط على Respring.", number: "3", rtl: true)
 
-                        Divider().overlay(Color.white.opacity(0.16))
-                            .padding(.vertical, 2)
+                        Divider().padding(.vertical, 2)
 
                         Text("Steps to Change Resolution 🇺🇸")
                             .font(.system(size: 18, weight: .bold))
@@ -484,34 +366,23 @@ struct ContentView: View {
 
                 Button {
                     hasShownInstructions = true
-                    withAnimation(.easeOut(duration: 0.2)) { showInstructions = false }
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        showingInstructions = false
+                    }
                 } label: {
                     Text("موافق")
                         .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 54)
-                        .background(
-                            LinearGradient(colors: [Color.blue, Color(red: 0.02, green: 0.34, blue: 0.95)],
-                                           startPoint: .topLeading, endPoint: .bottomTrailing),
-                            in: RoundedRectangle(cornerRadius: 14)
-                        )
+                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
+                        .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 18)
                 .padding(.bottom, 18)
             }
             .frame(maxWidth: 460)
-            .background(
-                LinearGradient(colors: [Color(red: 0.08, green: 0.09, blue: 0.11),
-                                        Color(red: 0.025, green: 0.03, blue: 0.045)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing),
-                in: RoundedRectangle(cornerRadius: 24)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 24)
-                    .stroke(Color.white.opacity(0.13), lineWidth: 1)
-            }
+            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
             .padding(.horizontal, 20)
         }
     }
@@ -524,19 +395,10 @@ struct ContentView: View {
             Text(number)
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(.white)
-                .frame(width: 30, height: 30)
-                .background(Color.blue.gradient, in: Circle())
+                .frame(width: 28, height: 28)
+                .background(Color.accentColor, in: Circle())
         }
         .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
-    }
-
-    private var cardBackground: some View {
-        RoundedRectangle(cornerRadius: 17)
-            .fill(Color(red: 0.055, green: 0.065, blue: 0.085))
-            .overlay {
-                RoundedRectangle(cornerRadius: 17)
-                    .stroke(Color.white.opacity(0.075), lineWidth: 1)
-            }
     }
 
     // MARK: - Pairing
@@ -547,8 +409,8 @@ struct ContentView: View {
             guard let url = try result.get().first else { return }
             let saved = try PairingStore.importFile(from: url)
             pairingName = saved.lastPathComponent
-            status = "Pairing file imported. Connect LocalDevVPN to continue."
-            isError = false
+            statusMessage = "Pairing file imported."
+            hasError = false
         } catch {
             present(error)
         }
@@ -556,47 +418,66 @@ struct ContentView: View {
 
     @MainActor
     private func pairTargetDevice() async {
-        busy = true
-        defer { busy = false }
         do {
             let path = try await pairingController.startAndWait()
             let saved = try PairingStore.importFile(from: URL(fileURLWithPath: path))
             pairingName = saved.lastPathComponent
-            status = "Pairing succeeded. Connect LocalDevVPN to continue."
-            isError = false
+            statusMessage = "Pairing succeeded. Read the device to verify the Airlift connection."
+            hasError = false
         } catch {
             present(error)
         }
     }
 
-    // MARK: - Resolution operations
+    // MARK: - Device read / resolution apply
 
     @MainActor
     private func readCurrent() async {
-        guard let pairing = PairingStore.currentURL else {
+        guard PairingStore.currentURL != nil else {
             present(AirliftBridgeError.missingPairingFile)
             return
         }
-        busy = true
-        defer { busy = false }
+        guard vpnRouteDetected else {
+            present(AirliftBridgeError.operationFailed("No VPN route to the configured device address was detected."))
+            return
+        }
+
+        isReading = true
+        hasReadDevice = false
+        widthText = ""
+        heightText = ""
+        currentResolution = "—"
+        airliftStatus = "Connecting…"
+        statusMessage = "Opening the paired-device session and reading the display configuration."
+        hasError = false
+        defer { isReading = false }
+
         do {
-            let data = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
-            if let resolution = try ResolutionPlistEditor.values(from: data) {
-                currentResolution = resolution.displayValue
-                widthText = String(resolution.width)
-                heightText = String(resolution.height)
-                status = "Current resolution read successfully."
-                isError = false
-            } else {
+            let data = try await AirliftBridge.readDisplayConfiguration(pairingURL: PairingStore.currentURL)
+            guard let resolution = try ResolutionPlistEditor.values(from: data) else {
                 throw ResolutionEditorError.invalidPropertyList
             }
+
+            currentResolution = resolution.displayValue
+            widthText = String(resolution.width)
+            heightText = String(resolution.height)
+            hasReadDevice = true
+            airliftStatus = "Device verified"
+            statusMessage = "Airlift read the device configuration successfully."
+            hasError = false
         } catch {
+            airliftStatus = "Connection failed"
+            hasReadDevice = false
             present(error)
         }
     }
 
     @MainActor
     private func applyResolution() async {
+        guard hasReadDevice else {
+            present(ResolutionEditorError.invalidPropertyList)
+            return
+        }
         guard let pairing = PairingStore.currentURL else {
             present(AirliftBridgeError.missingPairingFile)
             return
@@ -605,16 +486,20 @@ struct ContentView: View {
             present(ResolutionEditorError.invalidNumber)
             return
         }
+        guard vpnRouteDetected else {
+            present(AirliftBridgeError.operationFailed("The VPN route is no longer available. Reconnect the VPN and read the device again."))
+            return
+        }
 
-        busy = true
-        defer { busy = false }
+        isApplying = true
+        defer { isApplying = false }
 
         do {
             try ResolutionPlistEditor.validate(width: width, height: height)
             let original = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
             try BackupStore.save(original)
-            let modified = try ResolutionPlistEditor.applying(width: width, height: height, to: original)
 
+            let modified = try ResolutionPlistEditor.applying(width: width, height: height, to: original)
             do {
                 try await AirliftBridge.writeDisplayConfiguration(modified, pairingURL: pairing)
                 let verified = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
@@ -634,9 +519,10 @@ struct ContentView: View {
             }
 
             currentResolution = "\(width) × \(height)"
+            hasReadDevice = true
             restartRequired = true
-            status = "Resolution saved and verified. Reboot the device, reopen 67, then tap Respring."
-            isError = false
+            statusMessage = "Resolution saved and verified. Reboot the device, reopen 67, then tap Respring."
+            hasError = false
         } catch {
             present(error)
         }
@@ -648,19 +534,29 @@ struct ContentView: View {
             present(AirliftBridgeError.missingPairingFile)
             return
         }
-        busy = true
-        defer { busy = false }
+        guard vpnRouteDetected else {
+            present(AirliftBridgeError.operationFailed("The VPN route is unavailable."))
+            return
+        }
+
+        isRestoring = true
+        defer { isRestoring = false }
+
         do {
             let backup = try BackupStore.loadLatest()
             try await AirliftBridge.writeDisplayConfiguration(backup, pairingURL: pairing)
             let verified = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
             guard verified == backup else { throw ResolutionEditorError.verificationFailed }
+
             if let resolution = try ResolutionPlistEditor.values(from: verified) {
                 currentResolution = resolution.displayValue
+                widthText = String(resolution.width)
+                heightText = String(resolution.height)
+                hasReadDevice = true
             }
             restartRequired = true
-            status = "Original display configuration restored and verified. Reboot the device."
-            isError = false
+            statusMessage = "Original display configuration restored and verified. Reboot the device."
+            hasError = false
         } catch {
             present(error)
         }
@@ -673,15 +569,17 @@ struct ContentView: View {
             return
         }
         restartRequired = false
-        status = "Respring attempt started. If SpringBoard does not restart, reboot the device manually."
-        isError = false
+        statusMessage = "Respring attempt started. If SpringBoard does not restart, reboot the device manually."
+        hasError = false
     }
 
     @MainActor
     private func present(_ error: Error) {
-        isError = true
-        status = error.localizedDescription
-        alertMessage = error.localizedDescription
-        showAlert = true
+        let detail = error.localizedDescription
+        hasError = true
+        statusMessage = detail
+        errorTitle = "Airlift"
+        errorMessage = "The device operation could not be completed. Open Status → Connection details for the diagnostic trace."
+        showingError = true
     }
 }
