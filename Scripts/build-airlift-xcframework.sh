@@ -23,6 +23,18 @@ git -C "$BUILD_ROOT" checkout --quiet --detach "$AIRCARD_COMMIT"
 git -C "$BUILD_ROOT" apply --check --3way "$PATCH_FILE"
 git -C "$BUILD_ROOT" apply --3way "$PATCH_FILE"
 
+# AirCard's build script assumes Cargo's default target/ directory.
+# Our CI cache relocates Cargo output, so point XCFramework packaging at that cache.
+python3 - "$BUILD_ROOT/build-ios.sh" "$CARGO_TARGET_DIR" <<'PY'
+from pathlib import Path
+import sys
+script = Path(sys.argv[1])
+target_dir = sys.argv[2]
+content = script.read_text()
+content = content.replace("rust-core/target/", target_dir.rstrip("/") + "/")
+script.write_text(content)
+PY
+
 "$BUILD_ROOT/build-ios.sh"
 
 rm -rf "$ROOT/AirliftFFI.xcframework"
