@@ -197,6 +197,7 @@ struct ContentView: View {
                     .disabled(!canStartAirlift)
                 }
 
+                    if hasReadDevice {
                     Section("DEVICE RESOLUTION") {
                         HStack {
                             Text("Current")
