@@ -236,8 +236,10 @@ private let airliftLogCallback: AirliftLogCallback = { context, message in
 }
 
 enum AirliftBridge {
-    static let targetFile = "/var/mobile/Library/Preferences/com.apple.iokit.IOMobileGraphicsFamily.plist"
-    private static let targetDirectory = "/var/mobile/Library/Preferences"
+    // iOS 17+ stores managed mobile preferences under this path.
+    // Nugget's resolution editor uses the same canonical location.
+    static let targetFile = "/var/Managed Preferences/mobile/com.apple.iokit.IOMobileGraphicsFamily.plist"
+    private static let targetDirectory = "/var/Managed Preferences/mobile"
     private static let targetHost = NetworkStatus.targetHost
 
     static func readDisplayConfiguration(pairingURL: URL?) async throws -> Data {
