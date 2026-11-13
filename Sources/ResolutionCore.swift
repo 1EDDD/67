@@ -166,6 +166,9 @@ private func cSetTargetHost(_ host: UnsafePointer<CChar>?) -> Int32
 @_silgen_name("al_set_target_hosts")
 private func cSetTargetHosts(_ hosts: UnsafePointer<UnsafePointer<CChar>?>?, _ count: Int) -> Int32
 
+@_silgen_name("al_clear_target_hosts")
+private func cClearTargetHosts()
+
 @_silgen_name("al_exploit_read_file")
 private func cReadFile(
     _ pairingPath: UnsafePointer<CChar>?, _ iosPath: UnsafePointer<CChar>?,
@@ -224,6 +227,9 @@ private let airliftLogCallback: AirliftLogCallback = { context, message in
 }
 
 enum AirliftBridge {
+    private static let routeConfigurationLock = NSLock()
+    private static var configuredTargetHost: String?
+
     // iOS 17+ stores managed mobile preferences under this path.
     // Nugget's resolution editor uses the same canonical location.
     static let targetFile = "/var/Managed Preferences/mobile/com.apple.iokit.IOMobileGraphicsFamily.plist"
@@ -249,12 +255,23 @@ enum AirliftBridge {
             throw AirliftBridgeError.operationFailed("Enter a valid IPv4 connection address, for example 10.7.1.1.")
         }
 
+        // Airlift caches its last working RSD route. Clear that cache only when
+        // the user changes the configured endpoint, otherwise keep fast reconnects.
+        routeConfigurationLock.lock()
+        defer { routeConfigurationLock.unlock() }
+
+        if configuredTargetHost != normalizedHost {
+            cClearTargetHosts()
+        }
+
         let primaryResult = normalizedHost.withCString { cSetTargetHost($0) }
         guard primaryResult == 0 else {
             throw AirliftBridgeError.operationFailed(
                 "Airlift could not configure its primary VPN target (code \(primaryResult))."
             )
         }
+
+        configuredTargetHost = normalizedHost
 
         // AirCard's Airlift dialer supports multiple host candidates. Supplying
         // the active Wi-Fi/LAN addresses avoids relying on a single hard-coded IP.
