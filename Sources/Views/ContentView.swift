@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 struct ContentView: View {
     @StateObject private var pairingController = PairingController.shared
@@ -11,7 +12,7 @@ struct ContentView: View {
     @State private var heightText = ""
     @State private var currentResolution = "—"
 
-    @State private var vpnRouteDetected = false
+    @AppStorage("airliftTargetHost") private var targetHost = "10.7.1.1"
     @State private var airliftStatus = "Not verified"
     @State private var isReading = false
     @State private var isApplying = false
@@ -33,7 +34,7 @@ struct ContentView: View {
     }
 
     private var canStartAirlift: Bool {
-        PairingStore.currentURL != nil && vpnRouteDetected && !isReading && !isApplying && !isRestoring
+        PairingStore.currentURL != nil && !isBusy
     }
 
     private var isBusy: Bool {
@@ -98,16 +99,83 @@ struct ContentView: View {
                         }
                         .disabled(isBusy)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
+
+                    if pairingController.running {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 8) {
+                                ProgressView().controlSize(.small)
+                                Text(pairingController.pairingStatus)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            if let pin = pairingController.pairingPIN {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text("VERIFICATION CODE")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(.secondary)
+
+                                    HStack {
+                                        Text(pin)
+                                            .font(.system(size: 34, weight: .bold, design: .monospaced))
+                                            .monospacedDigit()
+                                        Spacer()
+                                        Button {
+                                            UIPasteboard.general.string = pin
+                                        } label: {
+                                            Label("Copy", systemImage: "doc.on.doc")
+                                        }
+                                        .buttonStyle(.plain)
+                                        .foregroundStyle(.tint)
+                                    }
+
+                                    Text("Settings → Privacy & Security → Developer Mode → Pair with 67")
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+
+                                    Button {
+                                        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                                        UIApplication.shared.open(url)
+                                    } label: {
+                                        Label("Open Settings", systemImage: "arrow.up.forward.app")
+                                    }
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(.tint)
+                                }
+                                .padding(14)
+                                .background(Color(uiColor: .tertiarySystemGroupedBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+
+                            Button(role: .destructive) {
+                                pairingController.softCancel()
+                            } label: {
+                                Label("Cancel Pairing", systemImage: "xmark")
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.vertical, 6)
+                    } else if pairingController.pairingStatus != "idle" {
+                        Text(pairingController.pairingStatus)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Section("CONNECTION") {
-                    statusRow(
-                        title: "VPN route",
-                        icon: "network",
-                        value: vpnRouteDetected ? "Route detected" : "No route",
-                        good: vpnRouteDetected
-                    )
+                    HStack {
+                        Label("Connection IP", systemImage: "network")
+                        Spacer()
+                        TextField("10.7.1.1", text: $targetHost)
+                            .font(.body.monospaced())
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .frame(width: 132)
+                            .accessibilityLabel("Airlift connection IP")
+                    }
 
                     statusRow(
                         title: "Airlift",
@@ -125,7 +193,6 @@ struct ContentView: View {
                                     .padding(.trailing, 4)
                             } else {
                                 Image(systemName: "arrow.down.doc")
-                                    .foregroundStyle(.tint)
                             }
                             Text(isReading ? "Reading device…" : "Read device")
                             Spacer()
@@ -138,7 +205,6 @@ struct ContentView: View {
                     .disabled(!canStartAirlift)
                 }
 
-                if hasReadDevice {
                     Section("DEVICE RESOLUTION") {
                         HStack {
                             Text("Current")
@@ -228,9 +294,10 @@ struct ContentView: View {
             .scrollContentBackground(.hidden)
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("67")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(uiColor: .secondarySystemGroupedBackground), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .preferredColorScheme(.dark)
         .fileImporter(
@@ -275,19 +342,6 @@ struct ContentView: View {
         .task {
             if !hasShownInstructions {
                 showingInstructions = true
-            }
-
-            while !Task.isCancelled {
-                let found = NetworkStatus.hasVPNRoute()
-                if found != vpnRouteDetected {
-                    vpnRouteDetected = found
-                    if !found {
-                        airliftStatus = "VPN route unavailable"
-                    } else if !hasReadDevice {
-                        airliftStatus = "Not verified"
-                    }
-                }
-                try? await Task.sleep(for: .seconds(2))
             }
         }
         .onChange(of: pairingName) { _, _ in
@@ -444,10 +498,6 @@ struct ContentView: View {
             present(AirliftBridgeError.missingPairingFile)
             return
         }
-        guard vpnRouteDetected else {
-            present(AirliftBridgeError.operationFailed("No VPN route to the configured device address was detected."))
-            return
-        }
 
         isReading = true
         hasReadDevice = false
@@ -460,7 +510,7 @@ struct ContentView: View {
         defer { isReading = false }
 
         do {
-            let data = try await AirliftBridge.readDisplayConfiguration(pairingURL: PairingStore.currentURL)
+            let data = try await AirliftBridge.readDisplayConfiguration(pairingURL: PairingStore.currentURL, targetHost: targetHost)
             guard let resolution = try ResolutionPlistEditor.values(from: data) else {
                 throw ResolutionEditorError.invalidPropertyList
             }
@@ -493,30 +543,25 @@ struct ContentView: View {
             present(ResolutionEditorError.invalidNumber)
             return
         }
-        guard vpnRouteDetected else {
-            present(AirliftBridgeError.operationFailed("The VPN route is no longer available. Reconnect the VPN and read the device again."))
-            return
-        }
-
         isApplying = true
         defer { isApplying = false }
 
         do {
             try ResolutionPlistEditor.validate(width: width, height: height)
-            let original = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
+            let original = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing, targetHost: targetHost)
             try BackupStore.save(original)
 
             let modified = try ResolutionPlistEditor.applying(width: width, height: height, to: original)
             do {
-                try await AirliftBridge.writeDisplayConfiguration(modified, pairingURL: pairing)
-                let verified = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
+                try await AirliftBridge.writeDisplayConfiguration(modified, pairingURL: pairing, targetHost: targetHost)
+                let verified = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing, targetHost: targetHost)
                 guard let actual = try ResolutionPlistEditor.values(from: verified),
                       actual == CanvasResolution(width: width, height: height) else {
                     throw ResolutionEditorError.verificationFailed
                 }
             } catch {
                 do {
-                    try await AirliftBridge.writeDisplayConfiguration(original, pairingURL: pairing)
+                    try await AirliftBridge.writeDisplayConfiguration(original, pairingURL: pairing, targetHost: targetHost)
                 } catch let rollbackError {
                     throw AirliftBridgeError.operationFailed(
                         "Apply failed: \(error.localizedDescription). Automatic restore also failed: \(rollbackError.localizedDescription). Keep the device connected and restore the saved backup."
@@ -541,18 +586,13 @@ struct ContentView: View {
             present(AirliftBridgeError.missingPairingFile)
             return
         }
-        guard vpnRouteDetected else {
-            present(AirliftBridgeError.operationFailed("The VPN route is unavailable."))
-            return
-        }
-
         isRestoring = true
         defer { isRestoring = false }
 
         do {
             let backup = try BackupStore.loadLatest()
-            try await AirliftBridge.writeDisplayConfiguration(backup, pairingURL: pairing)
-            let verified = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing)
+            try await AirliftBridge.writeDisplayConfiguration(backup, pairingURL: pairing, targetHost: targetHost)
+            let verified = try await AirliftBridge.readDisplayConfiguration(pairingURL: pairing, targetHost: targetHost)
             guard verified == backup else { throw ResolutionEditorError.verificationFailed }
 
             if let resolution = try ResolutionPlistEditor.values(from: verified) {
