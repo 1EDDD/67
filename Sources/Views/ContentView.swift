@@ -299,13 +299,12 @@ struct ContentView: View {
         ) { result in
             importPairing(result)
         }
-        .sheet(isPresented: $showingPresets) {
+        .fullScreenCover(isPresented: $showingPresets) {
             PresetPickerView { preset in
                 widthText = String(preset.resolution.width)
                 heightText = String(preset.resolution.height)
             }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
+            .preferredColorScheme(.dark)
         }
         .alert(errorTitle, isPresented: $showingError) {
             Button("OK", role: .cancel) {}
