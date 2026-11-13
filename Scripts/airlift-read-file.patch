@@ -368,20 +368,26 @@ index a759c80..664b5a9 100644
 +        // If AirTraffic already moved the target file into Media, restore it
 +        // before deleting temporary artifacts. Leave it in Media if restore fails.
 +        let mut original_restored = false;
-+        if let Ok(mut fd) = afc.open(&recovered_destination, AfcFopenMode::RdOnly).await {
-+            if let Ok(data) = fd.read_entire().await {
-+                let _ = fd.close().await;
-+                match exploit_write_single_file(&mut tunnel, &mut afc, &target_dir, &leaf, &data, logger).await {
-+                    Ok(()) => {
-+                        original_restored = true;
-+                        logger.log(format!("airlift: restored original {ios_path} after failed read"));
-+                    }
-+                    Err(e) => logger.log(format!("airlift: FAILED to restore {ios_path} after failed read: {e}; recovered copy retained at {recovered_destination}")),
++        let recovered_data = {
++            match afc.open(&recovered_destination, AfcFopenMode::RdOnly).await {
++                Ok(mut fd) => {
++                    let data = fd.read_entire().await.ok();
++                    let _ = fd.close().await;
++                    data
 +                }
-+            } else {
-+                let _ = fd.close().await;
-+                logger.log(format!("airlift: recovery file at {recovered_destination} could not be read; leaving it in Media"));
++                Err(_) => None,
 +            }
++        };
++        if let Some(data) = recovered_data {
++            match exploit_write_single_file(&mut tunnel, &mut afc, &target_dir, &leaf, &data, logger).await {
++                Ok(()) => {
++                    original_restored = true;
++                    logger.log(format!("airlift: restored original {ios_path} after failed read"));
++                }
++                Err(e) => logger.log(format!("airlift: FAILED to restore {ios_path} after failed read: {e}; recovered copy retained at {recovered_destination}")),
++            }
++        } else {
++            logger.log(format!("airlift: recovery file at {recovered_destination} could not be read; leaving it in Media"));
 +        }
 +
 +        let _ = afc.remove_all(&link_destination).await;
