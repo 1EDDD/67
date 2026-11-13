@@ -119,9 +119,9 @@ index a759c80..664b5a9 100644
 +
 +    let original_books_plist = match afc.open("Books/Sync/Books.plist", AfcFopenMode::RdOnly).await {
 +        Ok(mut fd) => {
-+            let data = fd.read_entire().await.ok();
++            let result = fd.read_entire().await;
 +            let _ = fd.close().await;
-+            data
++            Some(result.map_err(|e| format!("AFC read original Books.plist: {e:?}"))?)
 +        }
 +        Err(_) => None,
 +    };
