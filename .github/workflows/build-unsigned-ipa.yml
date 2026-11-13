@@ -13,6 +13,7 @@ concurrency:
 jobs:
   build:
     runs-on: macos-15
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,6 +25,14 @@ jobs:
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Airlift Rust build
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/67-airlift-target
+          key: 67-airlift-${{ runner.os }}-${{ hashFiles('Scripts/airlift-read-file.patch', 'Scripts/build-airlift-xcframework.sh') }}
+          restore-keys: |
+            67-airlift-${{ runner.os }}-
 
       - name: Build Airlift FFI
         run: bash Scripts/build-airlift-xcframework.sh
