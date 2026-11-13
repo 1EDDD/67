@@ -290,6 +290,21 @@ struct ContentView: View {
             .toolbarBackground(Color(uiColor: .secondarySystemGroupedBackground), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .foregroundStyle(hasReadDevice ? Color.green : Color.secondary)
+                        .symbolEffect(
+                            .rotate,
+                            options: .repeating,
+                            isActive: isReading || isApplying || isRestoring
+                        )
+                        .accessibilityLabel(
+                            isReading ? "Airlift connecting" :
+                            hasReadDevice ? "Airlift device verified" : "Airlift not verified"
+                        )
+                }
+            }
         }
         .preferredColorScheme(.dark)
         .fileImporter(
