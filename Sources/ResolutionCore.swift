@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 // MARK: - Resolution model and presets
 
