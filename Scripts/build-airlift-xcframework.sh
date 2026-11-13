@@ -12,6 +12,10 @@ export IPHONEOS_DEPLOYMENT_TARGET="18.0"
 
 source "$HOME/.cargo/env" 2>/dev/null || true
 
+# Reuse compiled Rust artifacts between CI runs to avoid rebuilding all Airlift dependencies.
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$HOME/.cache/67-airlift-target}"
+mkdir -p "$CARGO_TARGET_DIR"
+
 rm -rf "$BUILD_ROOT"
 git clone --quiet --filter=blob:none "$AIRCARD_REPO" "$BUILD_ROOT"
 git -C "$BUILD_ROOT" checkout --quiet --detach "$AIRCARD_COMMIT"
