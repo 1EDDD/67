@@ -160,18 +160,6 @@ enum ResolutionPlistEditor {
 private typealias AirliftLogCallback = @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> Void
 
 
-@_silgen_name("ALGetGrappaToken")
-private func cGetGrappaToken(
-    _ version: UInt32,
-    _ deviceType: UInt32,
-    _ protocolVersion: UInt32,
-    _ outputBuffer: UnsafeMutablePointer<UInt8>?,
-    _ maxLength: Int,
-    _ outputLength: UnsafeMutablePointer<Int>?,
-    _ errorBuffer: UnsafeMutablePointer<CChar>?,
-    _ errorLength: Int
-) -> Int32
-
 @_silgen_name("al_set_target_host")
 private func cSetTargetHost(_ host: UnsafePointer<CChar>?) -> Int32
 
@@ -255,8 +243,6 @@ enum AirliftBridge {
     }
 
     private static func configureTunnel(targetHost: String) throws {
-        try ensureGrappaProvider()
-
         let normalizedHost = targetHost.trimmingCharacters(in: .whitespacesAndNewlines)
         var address = in_addr()
         guard normalizedHost.withCString({ inet_pton(AF_INET, $0, &address) }) == 1 else {
@@ -292,38 +278,6 @@ enum AirliftBridge {
                     "Airlift could not register network host candidates (code \(result))."
                 )
             }
-        }
-    }
-
-    /// Force-link the Grappa token provider. Airlift resolves this symbol dynamically
-    /// when the AirTraffic sync negotiates the device's advertised Grappa version.
-    private static func ensureGrappaProvider() throws {
-        var token = [UInt8](repeating: 0, count: 512)
-        var tokenLength = 0
-        var errorBuffer = [CChar](repeating: 0, count: 512)
-
-        let result = token.withUnsafeMutableBufferPointer { tokenPointer in
-            errorBuffer.withUnsafeMutableBufferPointer { errorPointer in
-                cGetGrappaToken(
-                    1,
-                    0,
-                    1,
-                    tokenPointer.baseAddress,
-                    tokenPointer.count,
-                    &tokenLength,
-                    errorPointer.baseAddress,
-                    errorPointer.count
-                )
-            }
-        }
-
-        guard result == 0, tokenLength > 0 else {
-            let message = errorBuffer.withUnsafeBufferPointer { pointer in
-                pointer.baseAddress.map { String(cString: $0) } ?? "unknown Grappa error"
-            }
-            throw AirliftBridgeError.operationFailed(
-                "Grappa token provider unavailable: \(message) (code \(result))."
-            )
         }
     }
 
