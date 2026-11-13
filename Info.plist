@@ -11,6 +11,7 @@
     <key>CFBundleShortVersionString</key><string>1.0.0</string>
     <key>CFBundleVersion</key><string>1</string>
     <key>LSRequiresIPhoneOS</key><true/>
+    <key>UIRequiresFullScreen</key><true/>
     <key>MinimumOSVersion</key><string>18.0</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>67 uses your local network to pair with the iPad and communicate through Airlift.</string>
