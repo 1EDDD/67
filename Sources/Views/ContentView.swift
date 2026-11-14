@@ -298,6 +298,22 @@ struct ContentView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        if let url = URL(string: "https://x.com/15iwx?s=11") {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        Text("𝕏")
+                            .font(.system(size: 23, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 36, height: 36)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open @15iwx on X")
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Task { await readCurrent() }
