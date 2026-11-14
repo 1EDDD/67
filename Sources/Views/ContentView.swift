@@ -66,7 +66,7 @@ struct ContentView: View {
                     .listRowBackground(Color.clear)
                 }
 
-                Section("PAIRING") {
+                Section {
                     HStack(alignment: .center) {
                         Label("Pairing file", systemImage: "doc.text")
                         Spacer(minLength: 8)
@@ -158,7 +158,7 @@ struct ContentView: View {
                 }
 
                     if hasReadDevice {
-                    Section("DEVICE RESOLUTION") {
+                    Section {
                         Button {
                             Task { await readCurrent() }
                         } label: {
@@ -169,7 +169,7 @@ struct ContentView: View {
                                 } else {
                                     Image(systemName: "arrow.down.doc")
                                 }
-                                Text(isReading ? "Reading device…" : "Read device")
+                                Text(isReading ? "Reading device resolution…" : "Read device resolution")
                                 Spacer()
                                 if hasReadDevice {
                                     Image(systemName: "checkmark.circle.fill")
@@ -214,7 +214,7 @@ struct ContentView: View {
                         .disabled(!canStartAirlift || selectedResolution == nil)
                     }
                 } else {
-                    Section("DEVICE RESOLUTION") {
+                    Section {
                         Button {
                             Task { await readCurrent() }
                         } label: {
@@ -225,7 +225,7 @@ struct ContentView: View {
                                 } else {
                                     Image(systemName: "arrow.down.doc")
                                 }
-                                Text(isReading ? "Reading device…" : "Read device")
+                                Text(isReading ? "Reading device resolution…" : "Read device resolution")
                                 Spacer()
                                 if hasReadDevice {
                                     Image(systemName: "checkmark.circle.fill")
@@ -235,13 +235,10 @@ struct ContentView: View {
                         }
                         .disabled(!canStartAirlift)
 
-                        Label("Read the device first to show and edit its resolution.", systemImage: "info.circle")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
                     }
                 }
 
-                Section("SYSTEM") {
+                Section("LOQ") {
                     if BackupStore.hasBackup {
                         Button {
                             Task { await restoreBackup() }
@@ -275,6 +272,7 @@ struct ContentView: View {
                 }
             }
             .listStyle(.plain)
+            .ignoresSafeArea(.container, edges: .bottom)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 Button {
                     confirmingRespring = true
@@ -312,8 +310,8 @@ struct ContentView: View {
                                 isActive: isReading || isApplying || isRestoring
                             )
                             .accessibilityLabel(
-                                isReading ? "Airlift connecting" :
-                                hasReadDevice ? "Airlift device verified" : "Read device with Airlift"
+                                isReading ? "Reading device resolution" :
+                                hasReadDevice ? "Device resolution loaded" : "Read device resolution"
                             )
                     }
                     .buttonStyle(.plain)
@@ -325,6 +323,7 @@ struct ContentView: View {
         .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .preferredColorScheme(.dark)
         .statusBarHidden(UIDevice.current.userInterfaceIdiom == .phone)
+        .persistentSystemOverlays(UIDevice.current.userInterfaceIdiom == .phone ? .hidden : .automatic)
         .fileImporter(
             isPresented: $importingPairing,
             allowedContentTypes: [.data, .propertyList],
