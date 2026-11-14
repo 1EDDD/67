@@ -39,7 +39,8 @@ Download the latest unsigned IPA from [Releases](https://github.com/raad67/67/re
 3. Read your device resolution.
 4. Select a preset or enter a custom resolution.
 5. Apply the changes.
-6. Respring your device.
+6. Reboot your device.
+7. Open 67 again and tap **Respring**.
 
 ## Disclaimer
 
