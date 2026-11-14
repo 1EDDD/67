@@ -1,6 +1,6 @@
 name: ResolutionStudio
 options:
-  bundleIdPrefix: com.1eddd
+  bundleIdPrefix: com.raad67
   deploymentTarget:
     iOS: "18.0"
   projectFormat: xcode16_0
@@ -10,7 +10,7 @@ settings:
     SWIFT_VERSION: "5.0"
     IPHONEOS_DEPLOYMENT_TARGET: "18.0"
     TARGETED_DEVICE_FAMILY: "1,2"
-    PRODUCT_BUNDLE_IDENTIFIER: com.1eddd.67
+    PRODUCT_BUNDLE_IDENTIFIER: com.raad67.67
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     INFOPLIST_FILE: Info.plist
     GENERATE_INFOPLIST_FILE: "NO"
