@@ -17,27 +17,32 @@ struct DeviceResolutionPreset: Identifiable {
         _ names: [String],
         _ width: Int,
         _ height: Int
-    ) -> [DeviceResolutionPreset] {
-        names.map { name in
-            let slug = name.lowercased()
-                .replacingOccurrences(of: " ", with: "-")
-                .replacingOccurrences(of: "/", with: "-")
-                .replacingOccurrences(of: "(", with: "")
-                .replacingOccurrences(of: ")", with: "")
-            return DeviceResolutionPreset(
-                id: "\(slug)-\(width)x\(height)",
-                name: name,
-                category: category,
-                resolution: CanvasResolution(width: width, height: height)
-            )
-        }
+    ) -> DeviceResolutionPreset {
+        let name = names.joined(separator: "/")
+        let slug = name.lowercased()
+            .replacingOccurrences(of: " ", with: "-")
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: "(", with: "")
+            .replacingOccurrences(of: ")", with: "")
+        return DeviceResolutionPreset(
+            id: "\(category.rawValue.lowercased())-\(width)x\(height)",
+            name: name,
+            category: category,
+            resolution: CanvasResolution(width: width, height: height)
+        )
     }
 
     static let all: [DeviceResolutionPreset] = {
-        var values: [DeviceResolutionPreset] = []
+        var groups: [(category: PresetDeviceCategory, names: [String], width: Int, height: Int)] = []
 
         func add(_ category: PresetDeviceCategory, _ names: [String], _ width: Int, _ height: Int) {
-            values.append(contentsOf: make(category, names, width, height))
+            if let index = groups.firstIndex(where: {
+                $0.category == category && $0.width == width && $0.height == height
+            }) {
+                groups[index].names.append(contentsOf: names)
+            } else {
+                groups.append((category, names, width, height))
+            }
         }
 
         // iPhone models, newest release first. All ordinary iPhone presets are portrait.
@@ -115,6 +120,8 @@ struct DeviceResolutionPreset: Identifiable {
                     "iPad (4th generation)", "iPad (3rd generation)"], 2048, 1536)
         add(.ipad, ["iPad mini (1st generation)", "iPad 2", "iPad (1st generation)"], 1024, 768)
 
-        return values
+        return groups.map { group in
+            make(group.category, group.names, group.width, group.height)
+        }
     }()
 }
