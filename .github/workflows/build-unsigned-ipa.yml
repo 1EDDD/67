@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 concurrency:
   group: 67-main-v2
   cancel-in-progress: true
@@ -59,10 +62,15 @@ jobs:
           cp -R build/ResolutionStudio.xcarchive/Products/Applications/ResolutionStudio.app build/Payload/
           cd build
           ditto -c -k --sequesterRsrc --keepParent Payload 67-unsigned.ipa
+          test -s 67-unsigned.ipa
+          unzip -t 67-unsigned.ipa
 
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: 67-unsigned-ipa
-          path: build/67-unsigned.ipa
-          if-no-files-found: error
+      - name: Publish direct IPA download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${{ github.run_number }}"
+          gh release create "$TAG" build/67-unsigned.ipa \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "67 build ${{ github.run_number }}" \
+            --notes "Unsigned iOS IPA. Download 67-unsigned.ipa directly from Assets."
