@@ -56,7 +56,7 @@ struct ContentView: View {
                             Text("67")
                                 .font(.title2.weight(.bold))
                                 .foregroundStyle(.primary)
-                            Text("Resolution")
+                            Text("Resolution changer")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -157,50 +157,28 @@ struct ContentView: View {
                     }
                 }
 
-                Section("CONNECTION") {
-                    HStack {
-                        Label("Connection IP", systemImage: "network")
-                        Spacer()
-                        TextField("10.7.0.1", text: $targetHost)
-                            .font(.body.monospaced())
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .frame(width: 132)
-                            .accessibilityLabel("Airlift connection IP")
-                    }
-
-                    statusRow(
-                        title: "Airlift",
-                        icon: "arrow.left.arrow.right",
-                        value: airliftStatus,
-                        good: hasReadDevice
-                    )
-
-                    Button {
-                        Task { await readCurrent() }
-                    } label: {
-                        HStack {
-                            if isReading {
-                                ProgressView()
-                                    .padding(.trailing, 4)
-                            } else {
-                                Image(systemName: "arrow.down.doc")
-                            }
-                            Text(isReading ? "Reading device…" : "Read device")
-                            Spacer()
-                            if hasReadDevice {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                            }
-                        }
-                    }
-                    .disabled(!canStartAirlift)
-                }
-
                     if hasReadDevice {
                     Section("DEVICE RESOLUTION") {
+                        Button {
+                            Task { await readCurrent() }
+                        } label: {
+                            HStack {
+                                if isReading {
+                                    ProgressView()
+                                        .padding(.trailing, 4)
+                                } else {
+                                    Image(systemName: "arrow.down.doc")
+                                }
+                                Text(isReading ? "Reading device…" : "Read device")
+                                Spacer()
+                                if hasReadDevice {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                }
+                            }
+                        }
+                        .disabled(!canStartAirlift)
+
                         HStack {
                             Text("Current")
                             Spacer()
@@ -237,6 +215,26 @@ struct ContentView: View {
                     }
                 } else {
                     Section("DEVICE RESOLUTION") {
+                        Button {
+                            Task { await readCurrent() }
+                        } label: {
+                            HStack {
+                                if isReading {
+                                    ProgressView()
+                                        .padding(.trailing, 4)
+                                } else {
+                                    Image(systemName: "arrow.down.doc")
+                                }
+                                Text(isReading ? "Reading device…" : "Read device")
+                                Spacer()
+                                if hasReadDevice {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                }
+                            }
+                        }
+                        .disabled(!canStartAirlift)
+
                         Label("Read the device first to show and edit its resolution.", systemImage: "info.circle")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
@@ -256,15 +254,6 @@ struct ContentView: View {
                             }
                         }
                         .disabled(!canStartAirlift)
-                    }
-
-                    if restartRequired {
-                        Button(role: .destructive) {
-                            confirmingRespring = true
-                        } label: {
-                            Label("Respring", systemImage: "arrow.triangle.2.circlepath")
-                        }
-                        .disabled(isBusy)
                     }
                 }
 
@@ -286,6 +275,22 @@ struct ContentView: View {
                 }
             }
             .listStyle(.plain)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Button {
+                    confirmingRespring = true
+                } label: {
+                    Label("Respring", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+                .disabled(isBusy)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial)
+            }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .scrollContentBackground(.hidden)
             .background(Color(uiColor: .systemGroupedBackground))
@@ -319,6 +324,7 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .preferredColorScheme(.dark)
+        .statusBarHidden(UIDevice.current.userInterfaceIdiom == .phone)
         .fileImporter(
             isPresented: $importingPairing,
             allowedContentTypes: [.data, .propertyList],
