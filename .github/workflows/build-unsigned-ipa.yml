@@ -56,6 +56,14 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             archive
 
+      - name: Verify Airlift Grappa symbol
+        run: |
+          APP_BINARY="build/ResolutionStudio.xcarchive/Products/Applications/ResolutionStudio.app/ResolutionStudio"
+          xcrun nm -gU "$APP_BINARY" | grep -q 'ALGetGrappaToken' || {
+            echo "::error::ALGetGrappaToken is missing from the Release app binary; AirTraffic sync would fail."
+            exit 1
+          }
+
       - name: Package unsigned IPA
         run: |
           mkdir -p build/Payload
