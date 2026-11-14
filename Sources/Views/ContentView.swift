@@ -414,7 +414,7 @@ struct ContentView: View {
                     .font(.system(size: 21, weight: .bold))
                 Text("اختر اللغة")
                     .font(.system(size: 19, weight: .semibold))
-                    .environment(\\.layoutDirection, .rightToLeft)
+                    .environment(\.layoutDirection, .rightToLeft)
 
                 Button {
                     chooseLanguage("ar")
@@ -466,12 +466,12 @@ struct ContentView: View {
                         Text("خطوات تغيير الريزلوشن")
                             .font(.system(size: 20, weight: .bold))
                             .frame(maxWidth: .infinity, alignment: .trailing)
-                            .environment(\\.layoutDirection, .rightToLeft)
+                            .environment(\.layoutDirection, .rightToLeft)
 
                         Text("بعد ما تحفظ الريزلوشن الجديد بنجاح:")
                             .font(.system(size: 16, weight: .medium))
                             .frame(maxWidth: .infinity, alignment: .trailing)
-                            .environment(\\.layoutDirection, .rightToLeft)
+                            .environment(\.layoutDirection, .rightToLeft)
 
                         instructionRow("أعد تشغيل جهازك.", number: "1", rtl: true)
                         instructionRow("افتح 67.", number: "2", rtl: true)
@@ -711,8 +711,8 @@ struct ContentView: View {
             case .operationFailed:
                 errorTitle = "Airlift"
                 errorMessage = selectedLanguage == "ar"
-                    ? "تعذّر إكمال العملية عبر Airlift.\\n(غالباً ملف الريزلوشن تالف. انتقل إلى الإعدادات ← الشاشة والإضاءة ← تكبير الشاشة، واختر الخيار الثاني، ثم حاول مرة أخرى.)"
-                    : "Airlift operation failed.\\n(Your resolution file may be corrupted. Go to Settings → Display & Brightness → Display Zoom, select the second option, then try again.)"
+                    ? "تعذّر إكمال العملية عبر Airlift.\n(غالباً ملف الريزلوشن تالف. انتقل إلى الإعدادات ← الشاشة والإضاءة ← تكبير الشاشة، واختر الخيار الثاني، ثم حاول مرة أخرى.)"
+                    : "Airlift operation failed.\n(Your resolution file may be corrupted. Go to Settings → Display & Brightness → Display Zoom, select the second option, then try again.)"
             }
         } else {
             errorTitle = selectedLanguage == "ar" ? "خطأ" : "Error"
