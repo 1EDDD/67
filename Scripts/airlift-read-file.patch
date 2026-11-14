@@ -69,7 +69,7 @@ index a759c80..664b5a9 100644
  /// Write all files in `source_dir` directly to `target_dir` on the device outside the sandbox.
  ///
  /// # Safety
-@@ -1862,6 +1898,334 @@ async fn exploit_device_respring(
+@@ -1862,6 +1898,331 @@ async fn exploit_device_respring(
      }
  }
  
@@ -228,10 +228,9 @@ index a759c80..664b5a9 100644
 +        host_info_dict.insert("SyncedDataclasses".into(), plist::Value::Array(vec![plist::Value::String("Book".into())]));
 +        host_info_dict.insert("SyncedAssetTypes".into(), plist::Value::Array(vec![plist::Value::String("Book".into())]));
 +        host_info_dict.insert("Wakeable".into(), plist::Value::Boolean(false));
-+        let grappa_token = crate::grappa::generate_grappa_token(grappa_info, |s| logger.log(s));
-+        if let Some(token) = grappa_token.as_ref() {
-+            host_info_dict.insert("Grappa".into(), plist::Value::Data(token.clone()));
-+        }
++        let grappa_token = crate::grappa::generate_grappa_token(grappa_info, |s| logger.log(s))
++            .ok_or_else(|| "airlift: genuine Grappa host token unavailable; refusing unauthenticated sync".to_string())?;
++        host_info_dict.insert("Grappa".into(), plist::Value::Data(grappa_token.clone()));
 +    
 +        let mut host_info_params = plist::Dictionary::new();
 +        host_info_params.insert("HostInfo".into(), plist::Value::Dictionary(host_info_dict.clone()));
@@ -243,9 +242,7 @@ index a759c80..664b5a9 100644
 +        sync_req_params.insert("Dataclasses".into(), plist::Value::Array(vec![plist::Value::String("Book".into())]));
 +        sync_req_params.insert("DataclassAnchors".into(), plist::Value::Dictionary(plist::Dictionary::new()));
 +        sync_req_params.insert("HostInfo".into(), plist::Value::Dictionary(host_info_dict));
-+        if let Some(token) = grappa_token {
-+            sync_req_params.insert("Grappa".into(), plist::Value::Data(token));
-+        }
++        sync_req_params.insert("Grappa".into(), plist::Value::Data(grappa_token));
 +        send_atc_dict(&mut atc_stream, &make_atc_msg("RequestingSync", 1, Some(sync_req_params))).await?;
 +    
 +        let mut ready = false;

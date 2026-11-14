@@ -42,7 +42,8 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        GeometryReader { geometry in
+            NavigationStack {
             List {
                 Section {
                     HStack(spacing: 14) {
@@ -313,9 +314,12 @@ struct ContentView: View {
                     .disabled(!canStartAirlift)
                 }
             }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         }
+        .ignoresSafeArea(.container, edges: .all)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .preferredColorScheme(.dark)
         .fileImporter(
             isPresented: $importingPairing,
@@ -429,7 +433,7 @@ struct ContentView: View {
                     }
                     .padding(22)
                 }
-                .frame(maxHeight: 520)
+                .frame(maxHeight: .infinity)
 
                 Button {
                     hasShownInstructions = true
@@ -448,9 +452,8 @@ struct ContentView: View {
                 .padding(.horizontal, 18)
                 .padding(.bottom, 18)
             }
-            .frame(maxWidth: 460)
-            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
-            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(uiColor: .secondarySystemBackground))
         }
     }
 

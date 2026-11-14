@@ -163,9 +163,6 @@ private typealias AirliftLogCallback = @convention(c) (UnsafeMutableRawPointer?,
 @_silgen_name("al_set_target_host")
 private func cSetTargetHost(_ host: UnsafePointer<CChar>?) -> Int32
 
-@_silgen_name("al_set_target_hosts")
-private func cSetTargetHosts(_ hosts: UnsafePointer<UnsafePointer<CChar>?>?, _ count: Int) -> Int32
-
 @_silgen_name("al_clear_target_hosts")
 private func cClearTargetHosts()
 
@@ -252,7 +249,7 @@ enum AirliftBridge {
         let normalizedHost = targetHost.trimmingCharacters(in: .whitespacesAndNewlines)
         var address = in_addr()
         guard normalizedHost.withCString({ inet_pton(AF_INET, $0, &address) }) == 1 else {
-            throw AirliftBridgeError.operationFailed("Enter a valid IPv4 connection address, for example 10.7.1.1.")
+            throw AirliftBridgeError.operationFailed("Enter a valid IPv4 connection address, for example 10.7.0.1.")
         }
 
         // Airlift caches its last working RSD route. Clear that cache only when
@@ -273,29 +270,9 @@ enum AirliftBridge {
 
         configuredTargetHost = normalizedHost
 
-        // AirCard's Airlift dialer supports multiple host candidates. Supplying
-        // the active Wi-Fi/LAN addresses avoids relying on a single hard-coded IP.
-        let candidates = NetworkStatus.tunnelHostCandidates()
-        let allocated = candidates.map { strdup($0) }
-        defer {
-            allocated.forEach { pointer in
-                if let pointer { free(pointer) }
-            }
-        }
-
-        let pointers: [UnsafePointer<CChar>?] = allocated.map { pointer in
-            pointer.map { UnsafePointer($0) }
-        }
-        if !pointers.isEmpty {
-            let result = pointers.withUnsafeBufferPointer { buffer in
-                cSetTargetHosts(buffer.baseAddress, buffer.count)
-            }
-            guard result == 0 else {
-                throw AirliftBridgeError.operationFailed(
-                    "Airlift could not register network host candidates (code \(result))."
-                )
-            }
-        }
+        // Use only the explicit VPN/tunnel endpoint. Local interface addresses
+        // belong to this app's device, not necessarily to the paired target, and
+        // must never be sent as Airlift peer candidates.
     }
 
     private static func readSynchronously(pairingPath: String, remotePath: String, targetHost: String) throws -> Data {

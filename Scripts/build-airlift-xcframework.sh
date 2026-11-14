@@ -20,8 +20,11 @@ rm -rf "$BUILD_ROOT"
 git clone --quiet --filter=blob:none "$AIRCARD_REPO" "$BUILD_ROOT"
 git -C "$BUILD_ROOT" checkout --quiet --detach "$AIRCARD_COMMIT"
 
-git -C "$BUILD_ROOT" apply --check --3way "$PATCH_FILE"
-git -C "$BUILD_ROOT" apply --3way "$PATCH_FILE"
+# The patch is authored against the pinned AirCard commit above. Use a normal
+# context-checked apply: --3way requires the patch's old/new blob IDs to match,
+# and those IDs change whenever our local patch is refined.
+git -C "$BUILD_ROOT" apply --check "$PATCH_FILE"
+git -C "$BUILD_ROOT" apply "$PATCH_FILE"
 
 # AirCard's build script assumes Cargo's default target/ directory.
 # Our CI cache relocates Cargo output, so point XCFramework packaging at that cache.
