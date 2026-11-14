@@ -12,7 +12,7 @@ struct ContentView: View {
     @State private var heightText = ""
     @State private var currentResolution = "—"
 
-    @AppStorage("airliftTargetHost") private var targetHost = "10.7.1.1"
+    @AppStorage("airliftTargetHost") private var targetHost = "10.7.0.1"
     @State private var airliftStatus = "Not verified"
     @State private var isReading = false
     @State private var isApplying = false
@@ -159,7 +159,7 @@ struct ContentView: View {
                     HStack {
                         Label("Connection IP", systemImage: "network")
                         Spacer()
-                        TextField("10.7.1.1", text: $targetHost)
+                        TextField("10.7.0.1", text: $targetHost)
                             .font(.body.monospaced())
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
@@ -283,7 +283,8 @@ struct ContentView: View {
                     }
                 }
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .scrollContentBackground(.hidden)
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("67")
@@ -293,20 +294,28 @@ struct ContentView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .foregroundStyle(hasReadDevice ? Color.green : Color.secondary)
-                        .symbolEffect(
-                            .rotate,
-                            options: .repeating,
-                            isActive: isReading || isApplying || isRestoring
-                        )
-                        .accessibilityLabel(
-                            isReading ? "Airlift connecting" :
-                            hasReadDevice ? "Airlift device verified" : "Airlift not verified"
-                        )
+                    Button {
+                        Task { await readCurrent() }
+                    } label: {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .foregroundStyle(hasReadDevice ? Color.green : Color.secondary)
+                            .symbolEffect(
+                                .rotate,
+                                options: .repeating,
+                                isActive: isReading || isApplying || isRestoring
+                            )
+                            .accessibilityLabel(
+                                isReading ? "Airlift connecting" :
+                                hasReadDevice ? "Airlift device verified" : "Read device with Airlift"
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canStartAirlift)
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .preferredColorScheme(.dark)
         .fileImporter(
             isPresented: $importingPairing,
