@@ -232,8 +232,8 @@ enum AirliftBridge {
 
     // iOS 17+ stores managed mobile preferences under this path.
     // Nugget's resolution editor uses the same canonical location.
-    static let targetFile = "/var/Managed Preferences/mobile/com.apple.iokit.IOMobileGraphicsFamily.plist"
-    private static let targetDirectory = "/var/Managed Preferences/mobile"
+    static let targetFile = "/var/mobile/Library/Preferences/com.apple.iokit.IOMobileGraphicsFamily.plist"
+    private static let targetDirectory = "/var/mobile/Library/Preferences"
     static func readDisplayConfiguration(pairingURL: URL?, targetHost: String) async throws -> Data {
         guard let pairingURL else { throw AirliftBridgeError.missingPairingFile }
         return try await Task.detached(priority: .userInitiated) {
