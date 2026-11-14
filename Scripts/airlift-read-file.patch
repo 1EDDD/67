@@ -69,7 +69,7 @@ index a759c80..664b5a9 100644
  /// Write all files in `source_dir` directly to `target_dir` on the device outside the sandbox.
  ///
  /// # Safety
-@@ -1862,6 +1898,331 @@ async fn exploit_device_respring(
+@@ -1862,6 +1898,332 @@ async fn exploit_device_respring(
      }
  }
  
