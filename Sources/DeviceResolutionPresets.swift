@@ -47,7 +47,7 @@ struct DeviceResolutionPreset: Identifiable {
         add(.iphone, ["iPhone 18 Pro"], 1206, 2622)
         add(.iphone, ["iPhone Air"], 1260, 2736)
         add(.iphone, ["iPhone 17 Pro Max"], 1320, 2868)
-        add(.iphone, ["iPhone 17 Pro", "iPhone 17"], 1206, 2622)
+        add(.iphone, ["iPhone 17/17Pro"], 1206, 2622)
         add(.iphone, ["iPhone 17e"], 1170, 2532)
 
         add(.iphone, ["iPhone 16 Pro Max"], 1320, 2868)
