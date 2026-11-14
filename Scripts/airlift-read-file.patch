@@ -228,8 +228,9 @@ index a759c80..664b5a9 100644
 +        host_info_dict.insert("SyncedDataclasses".into(), plist::Value::Array(vec![plist::Value::String("Book".into())]));
 +        host_info_dict.insert("SyncedAssetTypes".into(), plist::Value::Array(vec![plist::Value::String("Book".into())]));
 +        host_info_dict.insert("Wakeable".into(), plist::Value::Boolean(false));
-+        if let Some(token) = crate::grappa::generate_grappa_token(grappa_info, |s| logger.log(s)) {
-+            host_info_dict.insert("Grappa".into(), plist::Value::Data(token));
++        let grappa_token = crate::grappa::generate_grappa_token(grappa_info, |s| logger.log(s));
++        if let Some(token) = grappa_token.as_ref() {
++            host_info_dict.insert("Grappa".into(), plist::Value::Data(token.clone()));
 +        }
 +    
 +        let mut host_info_params = plist::Dictionary::new();
@@ -242,7 +243,7 @@ index a759c80..664b5a9 100644
 +        sync_req_params.insert("Dataclasses".into(), plist::Value::Array(vec![plist::Value::String("Book".into())]));
 +        sync_req_params.insert("DataclassAnchors".into(), plist::Value::Dictionary(plist::Dictionary::new()));
 +        sync_req_params.insert("HostInfo".into(), plist::Value::Dictionary(host_info_dict));
-+        if let Some(token) = crate::grappa::generate_grappa_token(grappa_info, |s| logger.log(s)) {
++        if let Some(token) = grappa_token {
 +            sync_req_params.insert("Grappa".into(), plist::Value::Data(token));
 +        }
 +        send_atc_dict(&mut atc_stream, &make_atc_msg("RequestingSync", 1, Some(sync_req_params))).await?;
