@@ -5,6 +5,7 @@ import UIKit
 struct ContentView: View {
     @StateObject private var pairingController = PairingController.shared
     @AppStorage("hasShown67Instructions") private var hasShownInstructions = false
+    @AppStorage("67AppLanguage") private var selectedLanguage = ""
     @AppStorage("pendingSpringBoardRespring") private var restartRequired = false
 
     @State private var pairingName = PairingStore.currentFileName
@@ -20,6 +21,7 @@ struct ContentView: View {
     @State private var importingPairing = false
     @State private var showingPresets = false
     @State private var showingInstructions = false
+    @State private var showingLanguagePicker = false
     @State private var confirmingRespring = false
     @State private var showingError = false
     @State private var errorTitle = "67"
@@ -42,8 +44,7 @@ struct ContentView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            NavigationStack {
+        NavigationStack {
             List {
                 Section {
                     HStack(spacing: 14) {
@@ -314,12 +315,9 @@ struct ContentView: View {
                     .disabled(!canStartAirlift)
                 }
             }
-            }
-            .frame(width: geometry.size.width, height: geometry.size.height)
-            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         }
-        .ignoresSafeArea(.container, edges: .all)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .preferredColorScheme(.dark)
         .fileImporter(
             isPresented: $importingPairing,
@@ -353,14 +351,20 @@ struct ContentView: View {
             Text("Use this after applying the new resolution and restarting the device.")
         }
         .overlay {
-            if showingInstructions {
+            if showingLanguagePicker {
+                languagePickerNotice
+                    .transition(.opacity)
+                    .zIndex(10)
+            } else if showingInstructions {
                 firstLaunchNotice
                     .transition(.opacity)
                     .zIndex(10)
             }
         }
         .task {
-            if !hasShownInstructions {
+            if selectedLanguage.isEmpty {
+                showingLanguagePicker = true
+            } else if !hasShownInstructions {
                 showingInstructions = true
             }
         }
@@ -402,38 +406,89 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var languagePickerNotice: some View {
+        ZStack {
+            Color.black.opacity(0.78).ignoresSafeArea()
+            VStack(spacing: 16) {
+                Text("Choose Your Language")
+                    .font(.system(size: 21, weight: .bold))
+                Text("اختر اللغة")
+                    .font(.system(size: 19, weight: .semibold))
+                    .environment(\\.layoutDirection, .rightToLeft)
+
+                Button {
+                    chooseLanguage("ar")
+                } label: {
+                    Text("العربية")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    chooseLanguage("en")
+                } label: {
+                    Text("English")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(Color(uiColor: .tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                        .foregroundStyle(.primary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(24)
+            .frame(maxWidth: 360)
+            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
+            .padding(24)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func chooseLanguage(_ language: String) {
+        selectedLanguage = language
+        hasShownInstructions = false
+        showingLanguagePicker = false
+        withAnimation(.easeOut(duration: 0.2)) {
+            showingInstructions = true
+        }
+    }
+
     private var firstLaunchNotice: some View {
         ZStack {
             Color.black.opacity(0.78).ignoresSafeArea()
             VStack(spacing: 0) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        Text("خطوات تغيير الريزلوشن 🇸🇦")
-                            .font(.system(size: 19, weight: .bold))
+                VStack(alignment: selectedLanguage == "ar" ? .trailing : .leading, spacing: 18) {
+                    if selectedLanguage == "ar" {
+                        Text("خطوات تغيير الريزلوشن")
+                            .font(.system(size: 20, weight: .bold))
                             .frame(maxWidth: .infinity, alignment: .trailing)
-                            .environment(\.layoutDirection, .rightToLeft)
+                            .environment(\\.layoutDirection, .rightToLeft)
 
-                        instructionRow("اضغط Read device لقراءة الريزلوشن الحالي.", number: "1", rtl: true)
-                        instructionRow("عدّل Width وHeight أو اختر Presets.", number: "2", rtl: true)
-                        instructionRow("اضغط Apply Resolution.", number: "3", rtl: true)
-                        instructionRow("أعد تشغيل جهازك.", number: "4", rtl: true)
-                        instructionRow("افتح تطبيق 67.", number: "5", rtl: true)
-                        instructionRow("اضغط Respring.", number: "6", rtl: true)
+                        Text("بعد ما تحفظ الريزلوشن الجديد بنجاح:")
+                            .font(.system(size: 16, weight: .medium))
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .environment(\\.layoutDirection, .rightToLeft)
 
-                        Divider().padding(.vertical, 2)
+                        instructionRow("أعد تشغيل جهازك.", number: "1", rtl: true)
+                        instructionRow("افتح 67.", number: "2", rtl: true)
+                        instructionRow("اضغط Respring.", number: "3", rtl: true)
+                    } else {
+                        Text("Steps to Change Resolution")
+                            .font(.system(size: 20, weight: .bold))
 
-                        Text("Steps to Change Resolution 🇺🇸")
-                            .font(.system(size: 18, weight: .bold))
-                        instructionRow("Tap Read device to load the current resolution.", number: "1", rtl: false)
-                        instructionRow("Edit Width and Height, or choose Presets.", number: "2", rtl: false)
-                        instructionRow("Tap Apply Resolution.", number: "3", rtl: false)
-                        instructionRow("Restart your device.", number: "4", rtl: false)
-                        instructionRow("Open 67.", number: "5", rtl: false)
-                        instructionRow("Tap Respring.", number: "6", rtl: false)
+                        Text("After successfully saving the new resolution:")
+                            .font(.system(size: 16, weight: .medium))
+
+                        instructionRow("Reboot your device.", number: "1", rtl: false)
+                        instructionRow("Open 67.", number: "2", rtl: false)
+                        instructionRow("Tap Respring.", number: "3", rtl: false)
                     }
-                    .padding(22)
                 }
-                .frame(maxHeight: .infinity)
+                .padding(24)
 
                 Button {
                     hasShownInstructions = true
@@ -441,7 +496,7 @@ struct ContentView: View {
                         showingInstructions = false
                     }
                 } label: {
-                    Text("موافق")
+                    Text(selectedLanguage == "ar" ? "فهمت" : "Got it")
                         .font(.system(size: 17, weight: .bold))
                         .frame(maxWidth: .infinity)
                         .frame(height: 54)
@@ -452,9 +507,11 @@ struct ContentView: View {
                 .padding(.horizontal, 18)
                 .padding(.bottom, 18)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(uiColor: .secondarySystemBackground))
+            .frame(maxWidth: 360)
+            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
+            .padding(24)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func instructionRow(_ title: String, number: String, rtl: Bool) -> some View {
@@ -641,11 +698,27 @@ struct ContentView: View {
 
     @MainActor
     private func present(_ error: Error) {
-        let detail = error.localizedDescription
         hasError = true
-        statusMessage = detail
-        errorTitle = "Airlift"
-        errorMessage = "The device operation could not be completed. Open Status → Connection details for the diagnostic trace."
+        statusMessage = error.localizedDescription
+
+        if let bridgeError = error as? AirliftBridgeError {
+            switch bridgeError {
+            case .missingPairingFile:
+                errorTitle = selectedLanguage == "ar" ? "ملف الاقتران مطلوب" : "Pairing file required"
+                errorMessage = selectedLanguage == "ar"
+                    ? "يرجى استيراد ملف الاقتران أولاً."
+                    : "Import a pairing file before using Airlift."
+            case .operationFailed:
+                errorTitle = "Airlift"
+                errorMessage = selectedLanguage == "ar"
+                    ? "تعذّر إكمال العملية عبر Airlift.\\n(غالباً ملف الريزلوشن تالف. انتقل إلى الإعدادات ← الشاشة والإضاءة ← تكبير الشاشة، واختر الخيار الثاني، ثم حاول مرة أخرى.)"
+                    : "Airlift operation failed.\\n(Your resolution file may be corrupted. Go to Settings → Display & Brightness → Display Zoom, select the second option, then try again.)"
+            }
+        } else {
+            errorTitle = selectedLanguage == "ar" ? "خطأ" : "Error"
+            errorMessage = error.localizedDescription
+        }
+
         showingError = true
     }
 }
