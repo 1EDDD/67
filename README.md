@@ -35,7 +35,7 @@ Download the latest unsigned IPA from [Releases](https://github.com/raad67/67/re
 ## Usage
 
 1. Open 67.
-2. Import your Airlift pairing file.
+2. pair your device.
 3. Read your device resolution.
 4. Select a preset or enter a custom resolution.
 5. Apply the changes.
